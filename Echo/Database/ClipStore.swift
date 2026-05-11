@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SQLite3
 
@@ -30,21 +31,31 @@ actor ClipStore {
 
     func save(_ clip: Clip) {
         guard let db else { return }
+        let hash = contentHash(clip.contentData)
+
+        // Duplicate: bump timestamp so re-copied content floats to top, then skip insert.
+        prepare(db: db, sql: "UPDATE clips SET created_at = ? WHERE content_hash = ?;") { stmt in
+            sqlite3_bind_double(stmt, 1, clip.createdAt.timeIntervalSince1970)
+            bindText(stmt, 2, hash)
+        }
+        guard sqlite3_changes(db) == 0 else { return }
+
         let sql = """
-            INSERT OR REPLACE INTO clips
-              (id, content_data, content_type, source_app_bundle, source_app_name,
+            INSERT OR IGNORE INTO clips
+              (id, content_hash, content_data, content_type, source_app_bundle, source_app_name,
                window_title, created_at, is_pinned)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         prepare(db: db, sql: sql) { stmt in
             bindText(stmt, 1, clip.id.uuidString)
-            bindBlob(stmt, 2, clip.contentData)
-            bindText(stmt, 3, clip.contentType.rawValue)
-            bindText(stmt, 4, clip.sourceAppBundle)
-            bindText(stmt, 5, clip.sourceAppName)
-            bindText(stmt, 6, clip.windowTitle)
-            sqlite3_bind_double(stmt, 7, clip.createdAt.timeIntervalSince1970)
-            sqlite3_bind_int(stmt, 8, clip.isPinned ? 1 : 0)
+            bindText(stmt, 2, hash)
+            bindBlob(stmt, 3, clip.contentData)
+            bindText(stmt, 4, clip.contentType.rawValue)
+            bindText(stmt, 5, clip.sourceAppBundle)
+            bindText(stmt, 6, clip.sourceAppName)
+            bindText(stmt, 7, clip.windowTitle)
+            sqlite3_bind_double(stmt, 8, clip.createdAt.timeIntervalSince1970)
+            sqlite3_bind_int(stmt, 9, clip.isPinned ? 1 : 0)
         }
     }
 
@@ -87,6 +98,7 @@ actor ClipStore {
         let sql = """
             CREATE TABLE IF NOT EXISTS clips (
                 id                TEXT PRIMARY KEY,
+                content_hash      TEXT UNIQUE,
                 content_data      BLOB NOT NULL,
                 content_type      TEXT NOT NULL,
                 source_app_bundle TEXT,
@@ -98,8 +110,10 @@ actor ClipStore {
             CREATE INDEX IF NOT EXISTS idx_clips_time ON clips (is_pinned DESC, created_at DESC);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
-        // Migration: add is_pinned to existing databases (error ignored if column exists)
+        // Migrations — errors ignored when column already exists
         sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN content_hash TEXT;", nil, nil, nil)
+        sqlite3_exec(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_clips_hash ON clips (content_hash);", nil, nil, nil)
     }
 
     // MARK: - Row parsing
@@ -156,5 +170,9 @@ actor ClipStore {
 
     private func columnText(_ stmt: OpaquePointer?, _ idx: Int32) -> String? {
         sqlite3_column_text(stmt, idx).map { String(cString: $0) }
+    }
+
+    nonisolated private func contentHash(_ data: Data) -> String {
+        CryptoKit.SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

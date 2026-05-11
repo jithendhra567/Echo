@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var dashboardWindow: NSWindow?
     private var globalMonitor: Any?
+    private var notchPanel: NotchPanel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         store            = ClipStore()
@@ -56,6 +57,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.hotkeyManager.register(keyCode: keyCode, modifiers: mods)
             self.setupGlobalHotkey()
         }
+
+        notchPanel = NotchPanel()
+        notchPanel.start()
 
         viewModel.loadClips()
         monitor.start()
