@@ -17,9 +17,12 @@ final class NotchViewModel {
 
     let tray:   TrayModule
     let music:  MusicModule
+    let clock:  ClockModule
     let bridge: MediaRemoteBridge
 
-    var modules: [any NotchModule] { [tray, music] }
+    /// Display order is *also* priority order — `first(where: $0.isActive)`
+    /// picks Tray if files / drag, else Music if playing, else Clock.
+    var modules: [any NotchModule] { [tray, music, clock] }
 
     // MARK: - State
 
@@ -40,6 +43,7 @@ final class NotchViewModel {
         self.bridge = bridge
         self.tray   = TrayModule()
         self.music  = MusicModule(bridge: bridge)
+        self.clock  = ClockModule()
     }
 
     func start() {
@@ -54,8 +58,10 @@ final class NotchViewModel {
     /// Priority:
     /// 1. Drag in progress → Tray (forced).
     /// 2. While open and the user picked a tab → that module.
-    /// 3. First module whose `isActive == true`.
-    /// 4. Default to Tray.
+    /// 3. First module whose `isActive == true` (tray > music).
+    /// 4. Clock — fallback. Reports `isActive == false`, so when nothing
+    ///    else is active the pill stays as the bare notch (closed bar fades
+    ///    out), and the clock surface only appears once the user hovers.
     var activeModule: any NotchModule {
         if tray.isDragInFlight {
             return tray
@@ -69,10 +75,12 @@ final class NotchViewModel {
         if let m = modules.first(where: { $0.isActive }) {
             return m
         }
-        return tray
+        return clock
     }
 
-    /// True when any module wants to surface itself in the closed pill.
+    /// True when any module wants to surface itself in the closed pill
+    /// (Tray with files / drag, or Music playing). The Clock module reports
+    /// false here — it's a peek-on-hover module, not a permanent fixture.
     var anyModuleActive: Bool { modules.contains { $0.isActive } }
 
     // MARK: - Actions

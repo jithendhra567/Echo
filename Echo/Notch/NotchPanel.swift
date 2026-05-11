@@ -84,23 +84,28 @@ final class NotchPanel: NSPanel {
         dragMon.onDragBegan = { [weak self] in
             self?.viewModel.tray.dragBegan()
         }
-        dragMon.onDragMoved = { [weak self] pt in
+        dragMon.onDragMoved = { [weak self] screenPt in
             guard let self else { return }
 
-            // Throttle to ~60 Hz. `leftMouseDragged` fires at the display
-            // refresh rate; halo math + state branches don't need to run
-            // more than that.
+            // Throttle to ~60 Hz. `leftMouseDragged` fires at display refresh
+            // rate; halo math + state branches don't need to run more than that.
             let now = CACurrentMediaTime()
             if now - self.lastDragTick < (1.0 / 60.0) { return }
             self.lastDragTick = now
 
             guard let content = self.contentView else { return }
-            let local = content.convert(pt, from: nil)
-            let pill  = self.openPillRect(in: content.bounds)
+
+            // NSView.convert(_:from: nil) treats the source as WINDOW
+            // coordinates, not screen. `screenPt` is NSEvent.mouseLocation
+            // (screen-space), so we have to go screen → window → view.
+            let windowPt = self.convertPoint(fromScreen: screenPt)
+            let local    = content.convert(windowPt, from: nil)
+
+            let pill = self.openPillRect(in: content.bounds)
             // Halo: a generous radius around the open pill triggers pre-open.
-            let halo  = pill.insetBy(dx: -50, dy: -40)
+            let halo = pill.insetBy(dx: -60, dy: -50)
             if halo.contains(local) {
-                self.viewModel.open()      // idempotent — cheap no-op when already open
+                self.viewModel.open()           // idempotent — cheap no-op when already open
             }
         }
         dragMon.onDragEnded = { [weak self] in

@@ -62,13 +62,15 @@ struct NotchView: View {
 
     @ViewBuilder
     private func pill(module: any NotchModule, moduleHot: Bool) -> some View {
-        let width  = pillWidth(moduleHot: moduleHot)
-        let height = pillHeight()
-        let shape  = NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius)
+        let width        = pillWidth(module: module, moduleHot: moduleHot)
+        let height       = pillHeight()
+        let headerHeight = headerHeight(module: module)
+        let shape        = NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius)
 
         VStack(spacing: 0) {
             closedBar(module: module, moduleHot: moduleHot)
-                .frame(height: vm.closedNotchSize.height)
+                .frame(height: headerHeight)
+                .clipped()                  // hide the bar instead of removing it structurally — smoother spring
 
             if isOpen {
                 openContent(module: module)
@@ -82,8 +84,18 @@ struct NotchView: View {
         .clipShape(shape)
         .contentShape(Rectangle())          // ← cheap rect hit-test for hover
         .animation(activeSpring, value: vm.notchState)
-        .animation(activeSpring, value: moduleHot)
+        .animation(activeSpring, value: width)
+        .animation(activeSpring, value: headerHeight)
         .onHover { handleHover($0) }
+    }
+
+    /// Height of the closed-bar header strip inside the pill.
+    /// - Closed state: always the physical notch height (the closed bar *is* the pill).
+    /// - Open state: depends on the module — it's hidden (`0`) when the module's
+    ///   open view already surfaces the same info (e.g. clock).
+    private func headerHeight(module: any NotchModule) -> CGFloat {
+        guard isOpen else { return vm.closedNotchSize.height }
+        return module.showsClosedHeaderInOpen ? vm.closedNotchSize.height : 0
     }
 
     /// The closed-state bar always renders (it stays visible inside the open
@@ -150,9 +162,9 @@ struct NotchView: View {
     /// Pill dimensions are *explicit* on the outer VStack rather than per
     /// child, so SwiftUI animates a single `frame` change instead of trying
     /// to keep two layers in sync.
-    private func pillWidth(moduleHot: Bool) -> CGFloat {
+    private func pillWidth(module: any NotchModule, moduleHot: Bool) -> CGFloat {
         if isOpen { return NotchSizing.openSize.width }
-        if moduleHot { return vm.closedNotchSize.width + 90 }
+        if moduleHot { return vm.closedNotchSize.width + module.closedExtraWidth }
         return vm.closedNotchSize.width
     }
 

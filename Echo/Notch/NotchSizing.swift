@@ -7,8 +7,9 @@ enum NotchSizing {
     /// Padding around the window to make room for shadow / overshoot.
     static let shadowPadding: CGFloat = 20
 
-    /// The exact frame the pill occupies when expanded.
-    static let openSize = CGSize(width: 520, height: 160)
+    /// The exact frame the pill occupies when expanded. Height accommodates
+    /// a full 6-row month calendar with comfortable padding.
+    static let openSize = CGSize(width: 540, height: 200)
 
     /// Total NSWindow size — wide enough to contain the maximum open pill plus
     /// shadow room. The window itself never resizes, only its SwiftUI content.
