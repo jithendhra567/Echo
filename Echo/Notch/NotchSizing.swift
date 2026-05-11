@@ -26,11 +26,10 @@ enum NotchSizing {
         static let openBottom:   CGFloat = 24
     }
 
-    /// Springs — these specific values come from boring.notch's ContentView,
-    /// which itself was tuned to feel like NotchNook. Don't change them
-    /// without A/B-ing against the real apps.
+    /// Springs — `open` uses a bit less damping than boring.notch so width /
+    /// height / radii overshoot slightly then settle (bounce without scaling).
     enum Spring {
-        static let open  = (response: 0.42, damping: 0.8, blend: 0.0)
+        static let open  = (response: 0.42, damping: 0.72, blend: 0.0)
         static let close = (response: 0.45, damping: 1.0, blend: 0.0)
     }
 

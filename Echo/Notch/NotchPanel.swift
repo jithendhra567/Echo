@@ -17,12 +17,14 @@ final class NotchPanel: NSPanel {
 
     let viewModel = NotchViewModel()
     private let dragMon = GlobalDragMonitor()
+    /// Observer token — `nonisolated(unsafe)` so `deinit` can remove it.
+    nonisolated(unsafe) private var screenChangeObserver: NSObjectProtocol?
 
     init() {
-        let screen = NSScreen.main ?? NSScreen.screens.first!
-        let size   = NotchSizing.windowSize
+        let size = NotchSizing.windowSize
+        let screen = Self.screenForNotch()
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
-        let frame  = NSRect(origin: origin, size: size)
+        let frame = NSRect(origin: origin, size: size)
 
         super.init(
             contentRect: frame,
@@ -42,10 +44,44 @@ final class NotchPanel: NSPanel {
         setupDragMonitor()
     }
 
+    deinit {
+        if let screenChangeObserver {
+            NotificationCenter.default.removeObserver(screenChangeObserver)
+        }
+    }
+
     func start() {
         viewModel.start()
         alphaValue = 1
+        applyScreenLayout()
         orderFrontRegardless()
+
+        if let screenChangeObserver {
+            NotificationCenter.default.removeObserver(screenChangeObserver)
+        }
+        screenChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyScreenLayout()
+        }
+    }
+
+    /// Repositions the fixed-size panel on the menu-bar screen and refreshes
+    /// notch metrics (e.g. after plugging in an external display).
+    private func applyScreenLayout() {
+        let screen = Self.screenForNotch()
+        let size = NotchSizing.windowSize
+        let origin = NotchSizing.windowOrigin(for: screen, size: size)
+        setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+        viewModel.closedNotchSize = NotchSizing.closedNotchSize(for: screen)
+        contentView?.needsLayout = true
+        contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private static func screenForNotch() -> NSScreen {
+        NSScreen.main ?? NSScreen.screens.first!
     }
 
     private func configure() {
