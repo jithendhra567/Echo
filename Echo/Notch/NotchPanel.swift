@@ -22,7 +22,9 @@ final class NotchPanel: NSPanel {
 
     init() {
         let size = NotchSizing.windowSize
-        let screen = Self.screenForNotch()
+        let screen = NotchSizing.preferredNotchScreen()
+            ?? NSScreen.main
+            ?? NSScreen.screens.first!
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
         let frame = NSRect(origin: origin, size: size)
 
@@ -52,9 +54,7 @@ final class NotchPanel: NSPanel {
 
     func start() {
         viewModel.start()
-        alphaValue = 1
         applyScreenLayout()
-        orderFrontRegardless()
 
         if let screenChangeObserver {
             NotificationCenter.default.removeObserver(screenChangeObserver)
@@ -68,20 +68,31 @@ final class NotchPanel: NSPanel {
         }
     }
 
-    /// Repositions the fixed-size panel on the menu-bar screen and refreshes
-    /// notch metrics (e.g. after plugging in an external display).
+    /// Repositions on the **notched** built-in display when available; hides the
+    /// panel on plain external / desktop monitors so nothing draws over the tab bar.
     private func applyScreenLayout() {
-        let screen = Self.screenForNotch()
+        guard let screen = NotchSizing.preferredNotchScreen() else {
+            hideForNonNotchedDisplays()
+            return
+        }
+
+        ignoresMouseEvents = false
+        alphaValue = 1
         let size = NotchSizing.windowSize
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
         setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
         viewModel.closedNotchSize = NotchSizing.closedNotchSize(for: screen)
+        orderFrontRegardless()
         contentView?.needsLayout = true
         contentView?.layoutSubtreeIfNeeded()
     }
 
-    private static func screenForNotch() -> NSScreen {
-        NSScreen.main ?? NSScreen.screens.first!
+    /// No eligible notched screen (e.g. clamshell + external only) — remove from
+    /// screen list and ignore mouse so other apps receive clicks.
+    private func hideForNonNotchedDisplays() {
+        orderOut(nil)
+        alphaValue = 0
+        ignoresMouseEvents = true
     }
 
     private func configure() {

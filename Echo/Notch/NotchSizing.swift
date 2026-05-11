@@ -33,6 +33,31 @@ enum NotchSizing {
         static let close = (response: 0.45, damping: 1.0, blend: 0.0)
     }
 
+    /// Minimum horizontal gap (pt) between left and right auxiliary regions for
+    /// us to treat the screen as having a real menu-bar “island” / notch.
+    private static let minCenterIslandWidth: CGFloat = 50
+
+    /// `true` when the system reports split auxiliary menu-bar regions flanking
+    /// a center camera housing (notched MacBook). Typical HDMI / Thunderbolt
+    /// panels omit `auxiliaryTopLeftArea` / `auxiliaryTopRightArea`.
+    @MainActor
+    static func hasMenuBarNotch(_ screen: NSScreen) -> Bool {
+        guard let left = screen.auxiliaryTopLeftArea?.width,
+              let right = screen.auxiliaryTopRightArea?.width,
+              left > 0,
+              right > 0
+        else { return false }
+        let w = screen.frame.width
+        return left + right < w - minCenterIslandWidth
+    }
+
+    /// First attached screen that has a hardware-style menu-bar notch, if any.
+    /// `nil` when only non-notched displays are present (e.g. external-only).
+    @MainActor
+    static func preferredNotchScreen() -> NSScreen? {
+        NSScreen.screens.first { hasMenuBarNotch($0) }
+    }
+
     /// Computes the physical notch dimensions for a given screen. Falls back
     /// to a sensible default on Macs without a notch.
     @MainActor
