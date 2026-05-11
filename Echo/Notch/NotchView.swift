@@ -14,12 +14,16 @@ import UniformTypeIdentifiers
 ///   per mouse move instead of a path traversal.
 /// - No `compositingGroup()` — at this size it just adds a GPU layer to
 ///   rebuild every animation frame.
-/// - No hover debounce on **open**: the user is hovering the notch, they want
-///   it open. Close has a small debounce so quick cursor slips don't collapse.
+/// - **Open** waits 0.25s while the cursor stays on the pill so accidental
+///   menu-bar passes do not expand the notch. Close keeps a short debounce
+///   so quick cursor slips off the edge do not collapse.
 struct NotchView: View {
     @Environment(NotchViewModel.self) private var vm
     @State private var isDropTargeted = false
     @State private var closeTask: Task<Void, Never>?
+    @State private var openHoverTask: Task<Void, Never>?
+
+    private static let openHoverDebounce: Duration = .milliseconds(200)
 
     private var openSpring: Animation {
         let s = NotchSizing.Spring.open
@@ -175,17 +179,26 @@ struct NotchView: View {
     // MARK: - Hover
 
     private func handleHover(_ hovering: Bool) {
-        closeTask?.cancel()
-
         if hovering {
-            // Instant open. The user's cursor is on the notch — anything
-            // longer than "no debounce" feels like lag.
-            withAnimation(openSpring) {
-                vm.isHovering = true
-                vm.open()
+            closeTask?.cancel()
+            closeTask = nil
+            openHoverTask?.cancel()
+            openHoverTask = Task {
+                try? await Task.sleep(for: Self.openHoverDebounce)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    withAnimation(openSpring) {
+                        vm.isHovering = true
+                        vm.open()
+                    }
+                }
             }
             return
         }
+
+        openHoverTask?.cancel()
+        openHoverTask = nil
+        closeTask?.cancel()
 
         // Tiny tolerance for quick cursor slips off the pill edge.
         closeTask = Task {

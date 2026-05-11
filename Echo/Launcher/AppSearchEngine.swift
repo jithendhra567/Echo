@@ -15,6 +15,19 @@ actor AppSearchEngine {
         ]
         roots += fm.urls(for: .applicationDirectory, in: .localDomainMask).map(\.path)
         roots += fm.urls(for: .applicationDirectory, in: .userDomainMask).map(\.path)
+
+        // System utilities not in /Applications
+        roots += [
+            "/System/Library/CoreServices",
+            "/System/Library/CoreServices/Applications",
+        ]
+
+        // Developer tools nested inside Xcode (Simulator, Instruments, etc.)
+        for xcodeName in ["Xcode.app", "Xcode-beta.app"] {
+            let devApps = "/Applications/\(xcodeName)/Contents/Developer/Applications"
+            if fm.fileExists(atPath: devApps) { roots.append(devApps) }
+        }
+
         return roots
     }
 
