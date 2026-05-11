@@ -22,6 +22,73 @@ final class BrowserTabEngine: Sendable {
         }
     }
 
+    /// Brings an already-open tab to the front instead of opening a new one.
+    func focusTab(_ tab: BrowserTab) async {
+        let url = tab.url
+        let script: String
+        switch tab.browser {
+        case .safari:
+            script = """
+            tell application "Safari"
+                repeat with w in windows
+                    set tabList to tabs of w
+                    repeat with t in tabList
+                        if (URL of t) is "\(url)" then
+                            set current tab of w to t
+                            set index of w to 1
+                            activate
+                            return
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            """
+        case .chrome:
+            script = """
+            tell application "Google Chrome"
+                repeat with w in windows
+                    set tabList to tabs of w
+                    set tIdx to 1
+                    repeat with t in tabList
+                        if (URL of t) is "\(url)" then
+                            set active tab index of w to tIdx
+                            set index of w to 1
+                            activate
+                            return
+                        end if
+                        set tIdx to tIdx + 1
+                    end repeat
+                end repeat
+            end tell
+            """
+        case .arc:
+            script = """
+            tell application "Arc"
+                repeat with w in windows
+                    set tabList to tabs of w
+                    set tIdx to 1
+                    repeat with t in tabList
+                        if (URL of t) is "\(url)" then
+                            set active tab index of w to tIdx
+                            set index of w to 1
+                            activate
+                            return
+                        end if
+                        set tIdx to tIdx + 1
+                    end repeat
+                end repeat
+            end tell
+            """
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue(label: "echo.applescript.focus", qos: .userInitiated).async {
+                var error: NSDictionary?
+                NSAppleScript(source: script)?.executeAndReturnError(&error)
+                continuation.resume()
+            }
+        }
+    }
+
     // MARK: - Private
 
     private func query(browser: BrowserTab.Browser) async throws -> [BrowserTab] {

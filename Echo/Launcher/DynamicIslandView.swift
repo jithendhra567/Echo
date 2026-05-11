@@ -387,6 +387,19 @@ private struct BrowserTabResultRow: View {
 
             Spacer(minLength: 4)
 
+            // Saved tag (only for history entries not currently open)
+            if tab.isSaved {
+                Text("Saved")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.50))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.white.opacity(0.10))
+                    )
+            }
+
             // Browser badge
             if let bIcon = browserIcon {
                 Image(nsImage: bIcon)

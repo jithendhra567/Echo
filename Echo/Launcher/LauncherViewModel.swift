@@ -22,6 +22,10 @@ final class LauncherViewModel {
 
     private let engine    = AppSearchEngine()
     private let tabEngine = BrowserTabEngine()
+    private let tabStore  = BrowserTabStore()
+
+    private var cachedAllTabs: [BrowserTab] = []
+    private var tabPollerTask: Task<Void, Never>?
 
     enum ActivePanel { case apps, clipboard }
 
@@ -61,12 +65,9 @@ final class LauncherViewModel {
     func search() {
         selectedIndex     = 0
         clipSelectedIndex = 0
-        // App results update immediately (fast); tab results update when AppleScript finishes.
-        Task { results    = await engine.search(query: searchQuery) }
-        Task {
-            let all = await tabEngine.fetchTabs()
-            tabResults = tabEngine.search(query: searchQuery, in: all)
-        }
+        Task { results = await engine.search(query: searchQuery) }
+        // Search the in-memory cache — no AppleScript on each keystroke.
+        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
     }
 
     func refreshDefaults() async {
@@ -74,8 +75,18 @@ final class LauncherViewModel {
     }
 
     func refreshTabs() async {
-        let all = await tabEngine.fetchTabs()
-        tabResults = tabEngine.search(query: searchQuery, in: all)
+        // Fetch live tabs, persist them, then merge with saved history.
+        let activeTabs = await tabEngine.fetchTabs()
+        for tab in activeTabs { await tabStore.save(tab) }
+        await tabStore.prune()
+
+        let savedTabs  = await tabStore.fetchAll()
+        let activeURLs = Set(activeTabs.map(\.url))
+        // Saved-only tabs (not currently open) get the isSaved flag already set.
+        let savedOnly  = savedTabs.filter { !activeURLs.contains($0.url) }
+
+        cachedAllTabs = activeTabs + savedOnly
+        tabResults    = tabEngine.search(query: searchQuery, in: cachedAllTabs)
     }
 
     // MARK: - Panel switching
@@ -156,18 +167,35 @@ final class LauncherViewModel {
     }
 
     func openTab(_ tab: BrowserTab) {
-        guard let url = URL(string: tab.url) else { return }
-        NSWorkspace.shared.open(url)
+        Task {
+            await tabStore.touch(url: tab.url)
+            if tab.isSaved {
+                // Tab is from history (not currently open) — open a new tab.
+                guard let url = URL(string: tab.url) else { return }
+                NSWorkspace.shared.open(url)
+            } else {
+                // Tab is currently open — focus the existing tab via AppleScript.
+                await tabEngine.focusTab(tab)
+            }
+        }
         onLaunch?()
     }
 
     func dismiss() { onDismiss?() }
 
     func expand() {
-        Task { await refreshTabs() }
+        tabPollerTask?.cancel()
+        tabPollerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshTabs()
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
     }
 
     func reset() {
+        tabPollerTask?.cancel()
+        tabPollerTask     = nil
         searchQuery       = ""
         selectedIndex     = 0
         clipSelectedIndex = 0
