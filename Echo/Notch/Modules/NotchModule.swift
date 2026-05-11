@@ -36,7 +36,9 @@ protocol NotchModule: AnyObject {
 extension NotchModule {
     func handleDrop(providers: [NSItemProvider]) -> Bool { false }
     func setDropTargeted(_ targeted: Bool) {}
-    var closedCenter:           AnyView { AnyView(EmptyView()) }
-    var closedExtraWidth:       CGFloat { 90 }
-    var showsClosedHeaderInOpen: Bool   { true }
+    var closedLeft:              AnyView { AnyView(EmptyView()) }
+    var closedRight:             AnyView { AnyView(EmptyView()) }
+    var closedCenter:            AnyView { AnyView(EmptyView()) }
+    var closedExtraWidth:        CGFloat { 90 }
+    var showsClosedHeaderInOpen: Bool    { true }
 }

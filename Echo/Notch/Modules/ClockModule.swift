@@ -22,14 +22,7 @@ final class ClockModule: NotchModule {
     /// redundant tiny copy stuck above it.
     var showsClosedHeaderInOpen: Bool { false }
 
-    /// Wide enough for `16:11:42` on the left and `MON 11` on the right if a
-    /// future caller ever flips `isActive` on. Unused while `isActive` is
-    /// false, but kept here for parity with the other modules.
-    var closedExtraWidth: CGFloat { 160 }
-
-    // var closedLeft:   AnyView { AnyView(ClockClosedLeft()) }
-    // var closedRight:  AnyView { AnyView(ClockClosedRight()) }
-    var openView:     AnyView { AnyView(ClockOpenView()) }
+    var openView: AnyView { AnyView(ClockOpenView()) }
 }
 
 // MARK: - Formatters (cached — DateFormatter is expensive to construct)
@@ -39,21 +32,6 @@ private enum ClockFormat {
     static let timeWithSeconds: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
-    /// Locale-aware short weekday, uppercased at point of use.
-    static let weekdayShort: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = .current
-        f.setLocalizedDateFormatFromTemplate("EEE")
-        return f
-    }()
-
-    /// Day-of-month number, no leading zero.
-    static let dayNumber: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "d"
         return f
     }()
 
@@ -78,38 +56,6 @@ private enum ClockFormat {
         f.dateFormat = "yyyy"
         return f
     }()
-}
-
-// MARK: - Closed pill fragments
-
-private struct ClockClosedLeft: View {
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            Text(ClockFormat.timeWithSeconds.string(from: ctx.date))
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.95))
-                .monospacedDigit()
-                .fixedSize()
-        }
-    }
-}
-
-private struct ClockClosedRight: View {
-    var body: some View {
-        TimelineView(.everyMinute) { ctx in
-            HStack(spacing: 5) {
-                Text(ClockFormat.weekdayShort.string(from: ctx.date).uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .tracking(0.5)
-                Text(ClockFormat.dayNumber.string(from: ctx.date))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .monospacedDigit()
-            }
-            .fixedSize()
-        }
-    }
 }
 
 // MARK: - Open view
