@@ -36,6 +36,19 @@ actor AppSearchEngine {
         "agent", "helper", "daemon", "updater", "spawner", "installer"
     ]
 
+    /// Apple’s **Apps** (iOS apps on Mac) — keep below everyday apps in the launcher.
+    private static let deprioritizedLauncherBundleIDs: Set<String> = [
+        "com.apple.Apps",
+    ]
+
+    private func isDeprioritizedLauncherApp(_ app: AppInfo) -> Bool {
+        if let id = app.bundleIdentifier, Self.deprioritizedLauncherBundleIDs.contains(id) {
+            return true
+        }
+        // Fallback if bundle plist is missing / odd build.
+        return app.bundleURL.path == "/System/Applications/Apps.app"
+    }
+
     // MARK: - Indexing
 
     func indexApps() {
@@ -91,9 +104,13 @@ actor AppSearchEngine {
             return Array(
                 allApps
                     .sorted { lhs, rhs in
-                        lhs.usageCount != rhs.usageCount
-                            ? lhs.usageCount > rhs.usageCount
-                            : lhs.name.lowercased() < rhs.name.lowercased()
+                        if lhs.usageCount != rhs.usageCount {
+                            return lhs.usageCount > rhs.usageCount
+                        }
+                        let ldep = isDeprioritizedLauncherApp(lhs)
+                        let rdep = isDeprioritizedLauncherApp(rhs)
+                        if ldep != rdep { return !ldep }
+                        return lhs.name.lowercased() < rhs.name.lowercased()
                     }
                     .prefix(4)
             )
@@ -104,10 +121,17 @@ actor AppSearchEngine {
             guard let score = nameScore(query: q, name: app.name.lowercased()) else { return nil }
             let uses = usageCounts[app.bundleIdentifier ?? ""] ?? 0
             let usageBoost = Int(log2(Double(uses) + 1) * 200)
-            return (app, score + usageBoost)
+            let deprioritizePenalty = isDeprioritizedLauncherApp(app) ? 3_500 : 0
+            return (app, score + usageBoost - deprioritizePenalty)
         }
         return scored
-            .sorted { $0.1 > $1.1 }
+            .sorted { lhs, rhs in
+                if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                let ldep = isDeprioritizedLauncherApp(lhs.0)
+                let rdep = isDeprioritizedLauncherApp(rhs.0)
+                if ldep != rdep { return !ldep }
+                return lhs.0.name.lowercased() < rhs.0.name.lowercased()
+            }
             .prefix(5)
             .map(\.0)
     }

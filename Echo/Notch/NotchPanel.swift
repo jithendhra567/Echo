@@ -17,14 +17,21 @@ final class NotchPanel: NSPanel {
 
     let viewModel = NotchViewModel()
     private let dragMon = GlobalDragMonitor()
-    /// Observer token — `nonisolated(unsafe)` so `deinit` can remove it.
+    /// Observer tokens — `nonisolated(unsafe)` so `deinit` can remove them.
     nonisolated(unsafe) private var screenChangeObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var activeSpaceObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var activateAppObserver: NSObjectProtocol?
+    /// Poller for menu-bar-at-top in fullscreen — `nonisolated(unsafe)` for `deinit`.
+    nonisolated(unsafe) private var fullscreenRevealTimer: Timer?
+
+    /// Cursor entered the top reveal band at this time (flat panel + fullscreen).
+    private var menuRevealHoverStart: Date?
+    /// After a successful top-edge hold, stay visible until fullscreen ends.
+    private var flatFullscreenRevealLatched = false
 
     init() {
         let size = NotchSizing.windowSize
-        let screen = NotchSizing.preferredNotchScreen()
-            ?? NSScreen.main
-            ?? NSScreen.screens.first!
+        let screen = NotchSizing.targetScreenForPanel()
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
         let frame = NSRect(origin: origin, size: size)
 
@@ -37,11 +44,18 @@ final class NotchPanel: NSPanel {
 
         configure()
 
-        viewModel.closedNotchSize = NotchSizing.closedNotchSize(for: screen)
+        syncClosedNotchSize(with: screen)
 
         let hosting = NSHostingView(rootView: NotchView().environment(viewModel))
         hosting.sizingOptions = []
         contentView = hosting
+
+        viewModel.tray.onContentChanged = { [weak self] in
+            guard let self else { return }
+            self.syncClosedNotchSize(with: NotchSizing.targetScreenForPanel())
+            self.contentView?.needsLayout = true
+            self.contentView?.layoutSubtreeIfNeeded()
+        }
 
         setupDragMonitor()
     }
@@ -50,6 +64,14 @@ final class NotchPanel: NSPanel {
         if let screenChangeObserver {
             NotificationCenter.default.removeObserver(screenChangeObserver)
         }
+        if let activeSpaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceObserver)
+        }
+        if let activateAppObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activateAppObserver)
+        }
+        fullscreenRevealTimer?.invalidate()
+        fullscreenRevealTimer = nil
     }
 
     func start() {
@@ -66,13 +88,47 @@ final class NotchPanel: NSPanel {
         ) { [weak self] _ in
             self?.applyScreenLayout()
         }
+
+        if let activeSpaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceObserver)
+        }
+        activeSpaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyScreenLayout()
+        }
+
+        if let activateAppObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activateAppObserver)
+        }
+        activateAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyScreenLayout()
+        }
     }
 
-    /// Repositions on the **notched** built-in display when available; hides the
-    /// panel on plain external / desktop monitors so nothing draws over the tab bar.
+    /// Repositions on `NSScreen.main` (external or built-in). On displays
+    /// **without** a hardware notch, fullscreen with an auto-hidden menu bar
+    /// hides the pill until the user **holds** the cursor at the top edge
+    /// (menu-bar reveal). Windowed desktop use keeps the notch visible. Notched
+    /// Macs are unchanged.
     private func applyScreenLayout() {
-        guard let screen = NotchSizing.preferredNotchScreen() else {
-            hideForNonNotchedDisplays()
+        let screen = NotchSizing.targetScreenForPanel()
+        updateFullscreenRevealTimer(for: screen)
+
+        let holdSatisfied = updateFlatFullscreenMenuRevealState(for: screen)
+
+        if NotchSizing.shouldSuppressForExternalFullscreen(
+            screen,
+            menuRevealHoldSatisfied: holdSatisfied,
+            sessionRevealed: flatFullscreenRevealLatched
+        ) {
+            suppressNotchPanel()
             return
         }
 
@@ -81,15 +137,76 @@ final class NotchPanel: NSPanel {
         let size = NotchSizing.windowSize
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
         setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
-        viewModel.closedNotchSize = NotchSizing.closedNotchSize(for: screen)
+        syncClosedNotchSize(with: screen)
         orderFrontRegardless()
         contentView?.needsLayout = true
         contentView?.layoutSubtreeIfNeeded()
     }
 
-    /// No eligible notched screen (e.g. clamshell + external only) — remove from
-    /// screen list and ignore mouse so other apps receive clicks.
-    private func hideForNonNotchedDisplays() {
+    /// Flat panels use a 4pt strip only when the tray is idle; drag / files use full height.
+    private func syncClosedNotchSize(with screen: NSScreen) {
+        let compactStrip =
+            !NotchSizing.hasMenuBarNotch(screen)
+            && !viewModel.tray.isDragInFlight
+            && viewModel.tray.files.isEmpty
+        viewModel.closedNotchSize = NotchSizing.closedNotchSize(
+            for: screen,
+            flatUseCompactStripHeight: compactStrip
+        )
+    }
+
+    /// Low-rate timer while fullscreen may be hiding the menu bar — `NSEvent`
+    /// does not post notifications, so we re-check layout on mouse moves to top.
+    private func updateFullscreenRevealTimer(for screen: NSScreen) {
+        let poll = NotchSizing.needsMenuRevealPolling(for: screen)
+        if poll {
+            guard fullscreenRevealTimer == nil else { return }
+            let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+                DispatchQueue.main.async { self?.applyScreenLayout() }
+            }
+            RunLoop.main.add(t, forMode: .common)
+            fullscreenRevealTimer = t
+        } else {
+            fullscreenRevealTimer?.invalidate()
+            fullscreenRevealTimer = nil
+        }
+    }
+
+    /// Tracks dwell at the top edge on non-notched fullscreen; updates
+    /// `flatFullscreenRevealLatched`. Returns whether the hold duration is met.
+    private func updateFlatFullscreenMenuRevealState(for screen: NSScreen) -> Bool {
+        if NotchSizing.hasMenuBarNotch(screen) {
+            menuRevealHoverStart = nil
+            flatFullscreenRevealLatched = false
+            return false
+        }
+        if !NotchSizing.looksLikeFullscreenMenuHidden(screen) {
+            menuRevealHoverStart = nil
+            flatFullscreenRevealLatched = false
+            return false
+        }
+
+        if NotchSizing.mouseNearTopMenuReveal(on: screen) {
+            if menuRevealHoverStart == nil {
+                menuRevealHoverStart = Date()
+            }
+        } else {
+            menuRevealHoverStart = nil
+        }
+
+        let holdMet: Bool
+        if let start = menuRevealHoverStart {
+            holdMet = Date().timeIntervalSince(start) >= NotchSizing.menuRevealHoldDuration
+        } else {
+            holdMet = false
+        }
+        if holdMet {
+            flatFullscreenRevealLatched = true
+        }
+        return holdMet
+    }
+
+    private func suppressNotchPanel() {
         orderOut(nil)
         alphaValue = 0
         ignoresMouseEvents = true

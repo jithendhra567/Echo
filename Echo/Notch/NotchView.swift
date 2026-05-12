@@ -69,7 +69,11 @@ struct NotchView: View {
         let width        = pillWidth(module: module, moduleHot: moduleHot)
         let height       = pillHeight()
         let headerHeight = headerHeight(module: module)
-        let shape        = NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius)
+        let sumR         = topRadius + bottomRadius
+        let radiusScale  = sumR > 0 ? min(1, (height - 1) / (sumR + 2)) : 1
+        let effTopR      = topRadius * radiusScale
+        let effBottomR   = bottomRadius * radiusScale
+        let shape        = NotchShape(topCornerRadius: effTopR, bottomCornerRadius: effBottomR)
 
         VStack(spacing: 0) {
             closedBar(module: module, moduleHot: moduleHot)
