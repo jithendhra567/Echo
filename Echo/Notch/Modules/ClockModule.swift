@@ -28,13 +28,6 @@ final class ClockModule: NotchModule {
 // MARK: - Formatters (cached — DateFormatter is expensive to construct)
 
 private enum ClockFormat {
-    /// 24-hour clock with seconds, e.g. `16:11:42`.
-    static let timeWithSeconds: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
     /// Full weekday + day + month name, e.g. `Monday, 11 May`.
     static let fullDate: DateFormatter = {
         let f = DateFormatter()
@@ -81,6 +74,58 @@ private struct ClockOpenView: View {
     }
 }
 
+/// Renders `HH:mm:ss` with a per-digit numeric roll when values change
+/// (TimelineView tick every second).
+private struct AnimatedClockTime: View {
+    let now: Date
+
+    private var calendar: Calendar { .current }
+
+    private var hour: Int { calendar.component(.hour, from: now) }
+    private var minute: Int { calendar.component(.minute, from: now) }
+    private var second: Int { calendar.component(.second, from: now) }
+
+    private static let digitFont = Font.system(size: 34, weight: .semibold, design: .rounded)
+    private static let rollAnimation = Animation.spring(response: 0.38, dampingFraction: 0.78)
+
+    var body: some View {
+        HStack(spacing: 0) {
+            digitPair(hour)
+            colon
+            digitPair(minute)
+            colon
+            digitPair(second)
+        }
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+
+    private var colon: some View {
+        Text(":")
+            .font(Self.digitFont)
+            .foregroundStyle(.white)
+    }
+
+    private func digitPair(_ value: Int) -> some View {
+        let v = min(99, max(0, value))
+        let tens = v / 10
+        let ones = v % 10
+        return HStack(spacing: 0) {
+            rollingDigit(tens)
+            rollingDigit(ones)
+        }
+    }
+
+    private func rollingDigit(_ digit: Int) -> some View {
+        Text(verbatim: String(digit))
+            .font(Self.digitFont)
+            .foregroundStyle(.white)
+            .contentTransition(.numericText())
+            .animation(Self.rollAnimation, value: digit)
+    }
+}
+
 private struct ClockSummaryColumn: View {
     let now: Date
 
@@ -100,12 +145,7 @@ private struct ClockSummaryColumn: View {
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.55))
 
-            Text(ClockFormat.timeWithSeconds.string(from: now))
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            AnimatedClockTime(now: now)
 
             Text(ClockFormat.fullDate.string(from: now))
                 .font(.system(size: 11, weight: .medium, design: .rounded))
