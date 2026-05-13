@@ -50,7 +50,10 @@ struct NotchView: View {
     var body: some View {
         let module     = vm.activeModule
         let moduleHot  = module.isActive          // cache so body doesn't re-read inside child computations
-        let dropTypes: [UTType] = [.fileURL, .url]
+        let dropTypes: [UTType] = [
+            .fileURL, .url,
+            .png, .jpeg, .tiff, .gif, .heic, .image,
+        ]
 
         ZStack(alignment: .top) {
             // Background fills the window so the ZStack has a defined size;

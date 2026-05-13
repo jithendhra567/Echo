@@ -41,8 +41,10 @@ final class ClipboardPanel: NSPanel {
 
         // Start off-screen below the dock, then spring up
         setFrame(NSRect(x: x, y: vis.minY - h - 10, width: w, height: h), display: false)
-        orderFront(nil)
         isShowing = true
+        // Activate Echo so the search field can receive keyboard input.
+        NSApp.activate(ignoringOtherApps: true)
+        makeKeyAndOrderFront(nil)
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.55
@@ -73,7 +75,6 @@ final class ClipboardPanel: NSPanel {
 
     func toggle() { isShowing ? hide() : show() }
 
-    // Prevent the panel from ever stealing key/main window status
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool  { true  }
     override var canBecomeMain: Bool { false }
 }

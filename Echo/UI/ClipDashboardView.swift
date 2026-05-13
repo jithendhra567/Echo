@@ -72,10 +72,10 @@ struct ClipDashboardView: View {
                     }
                     .padding(.vertical, 1)
                 }
-                .frame(maxWidth: 260)
+                .frame(maxWidth: 220)
             }
 
-            // Search field — fills remaining middle space
+            // Search field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -113,6 +113,9 @@ struct ClipDashboardView: View {
             .buttonStyle(.plain)
             .help("Close")
         }
+        // Cap the row width so it stays compact and centered on wide screens.
+        .frame(maxWidth: 740)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
     }

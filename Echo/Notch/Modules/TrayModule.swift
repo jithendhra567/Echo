@@ -93,6 +93,151 @@ final class TrayModule: NotchModule {
         return dest
     }
 
+    private nonisolated static func preferredImageExtension(forTypeIdentifier tid: String) -> String {
+        if tid == UTType.png.identifier { return "png" }
+        if tid == UTType.tiff.identifier { return "tiff" }
+        if tid == UTType.jpeg.identifier { return "jpg" }
+        if tid == UTType.heic.identifier { return "heic" }
+        if tid == UTType.gif.identifier { return "gif" }
+        if let t = UTType(tid), let ext = t.preferredFilenameExtension { return ext }
+        return "png"
+    }
+
+    private nonisolated static func screenshotDropBaseFileName() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        return "Screenshot \(f.string(from: Date()))"
+    }
+
+    /// Build file bytes on the `NSItemProvider` callback thread (no `item` escape across isolation).
+    private nonisolated static func encodeImageDropItem(item: NSSecureCoding?, typeIdentifier: String) throws -> (Data, String) {
+        let extHint = preferredImageExtension(forTypeIdentifier: typeIdentifier)
+        if let data = item as? Data {
+            return (data, extHint)
+        }
+        if let img = item as? NSImage {
+            var fileType: NSBitmapImageRep.FileType = .png
+            var outExt = "png"
+            switch extHint.lowercased() {
+            case "jpg", "jpeg":
+                fileType = .jpeg
+                outExt = "jpg"
+            case "tiff", "tif":
+                fileType = .tiff
+                outExt = "tiff"
+            default:
+                break
+            }
+            guard let tiff = img.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let outData = rep.representation(
+                    using: fileType,
+                    properties: fileType == .jpeg ? [.compressionFactor: 0.88] : [:]
+                  )
+            else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            return (outData, outExt)
+        }
+        if let url = item as? URL, url.isFileURL {
+            let bytes = try Data(contentsOf: url)
+            let pathExt = url.pathExtension.lowercased()
+            return (bytes, pathExt.isEmpty ? extHint : pathExt)
+        }
+        throw CocoaError(.fileReadCorruptFile)
+    }
+
+    private func writeShelfImportedImage(data: Data, preferredExtension: String) throws -> URL {
+        let shelf = try Self.shelfDirectoryURL()
+        let ext = preferredExtension.lowercased()
+        let preferred = "\(Self.screenshotDropBaseFileName()).\(ext)"
+        let name = Self.uniqueFileName(preferred: preferred, in: shelf)
+        let dest = shelf.appendingPathComponent(name, isDirectory: false)
+        try data.write(to: dest, options: .atomic)
+        return dest
+    }
+
+    /// Types registered for image drags (screenshot bubble, Photos, etc.). Most specific first.
+    private static let imageDropTypeIdentifiers: [String] = [
+        UTType.png.identifier,
+        UTType.tiff.identifier,
+        UTType.jpeg.identifier,
+        UTType.heic.identifier,
+        UTType.gif.identifier,
+        UTType.image.identifier,
+    ]
+
+    // MARK: - Drop
+
+    func setDropTargeted(_ targeted: Bool) {
+        isDropHighlighted = targeted
+    }
+
+    func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var accepted = false
+        for provider in providers {
+            if consumeFileURLDrop(provider) { accepted = true; continue }
+            if consumeImageDrop(provider) { accepted = true; continue }
+        }
+        return accepted
+    }
+
+    /// Finder / path-based drops.
+    private func consumeFileURLDrop(_ provider: NSItemProvider) -> Bool {
+        let typeIDs = [UTType.fileURL.identifier, UTType.url.identifier]
+        for tid in typeIDs where provider.hasItemConformingToTypeIdentifier(tid) {
+            provider.loadItem(forTypeIdentifier: tid, options: nil) { [weak self] item, _ in
+                let fileURL: URL? = {
+                    if let u = item as? URL { return u }
+                    if let d = item as? Data { return URL(dataRepresentation: d, relativeTo: nil) }
+                    if let s = item as? String {
+                        if s.hasPrefix("file:"), let u = URL(string: s) { return u }
+                        if s.hasPrefix("/") { return URL(fileURLWithPath: s) }
+                        return URL(string: s)
+                    }
+                    return nil
+                }()
+                guard let fileURL, fileURL.isFileURL else { return }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    do {
+                        let shelfURL = try self.resolvedShelfURL(from: fileURL)
+                        self.addFiles([shelfURL])
+                    } catch {}
+                }
+            }
+            return true
+        }
+        return false
+    }
+
+    /// Screenshot thumbnail and other image-only drags (no file URL yet).
+    private func consumeImageDrop(_ provider: NSItemProvider) -> Bool {
+        for tid in Self.imageDropTypeIdentifiers where provider.hasItemConformingToTypeIdentifier(tid) {
+            provider.loadItem(forTypeIdentifier: tid, options: nil) { [weak self] item, _ in
+                let payload = Result { try Self.encodeImageDropItem(item: item, typeIdentifier: tid) }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    switch payload {
+                    case .success(let bytesAndExt):
+                        do {
+                            let shelfURL = try self.writeShelfImportedImage(
+                                data: bytesAndExt.0,
+                                preferredExtension: bytesAndExt.1
+                            )
+                            self.addFiles([shelfURL])
+                        } catch {}
+                    case .failure:
+                        break
+                    }
+                }
+            }
+            return true
+        }
+        return false
+    }
+
     // MARK: - File operations
 
     func addFiles(_ urls: [URL]) {
@@ -124,41 +269,6 @@ final class TrayModule: NotchModule {
         isDragInFlight    = false
         isDropHighlighted = false
         onContentChanged?()
-    }
-
-    // MARK: - Drop
-
-    func setDropTargeted(_ targeted: Bool) {
-        isDropHighlighted = targeted
-    }
-
-    func handleDrop(providers: [NSItemProvider]) -> Bool {
-        let typeIDs = [UTType.fileURL.identifier, UTType.url.identifier]
-        var loaded = false
-        for p in providers {
-            for tid in typeIDs where p.hasItemConformingToTypeIdentifier(tid) {
-                loaded = true
-                p.loadItem(forTypeIdentifier: tid, options: nil) { [weak self] item, _ in
-                    let url: URL?
-                    if      let u = item as? URL                            { url = u }
-                    else if let d = item as? Data                           { url = URL(dataRepresentation: d, relativeTo: nil) }
-                    else if let s = item as? String, let u = URL(string: s) { url = u }
-                    else                                                    { url = nil }
-                    guard let url, url.isFileURL || url.scheme != nil else { return }
-                    Task { @MainActor in
-                        guard let self else { return }
-                        do {
-                            let shelfURL = try self.resolvedShelfURL(from: url)
-                            self.addFiles([shelfURL])
-                        } catch {
-                            // Move can fail (permissions / volume); copy may still fail — ignore silently.
-                        }
-                    }
-                }
-                break
-            }
-        }
-        return loaded
     }
 
     // MARK: - View fragments
