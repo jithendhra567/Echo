@@ -439,7 +439,7 @@ private struct TrayFileCard: View {
             .offset(x: 4, y: -2)
         }
         .onDrag {
-            NSItemProvider(contentsOf: file.url) ?? NSItemProvider()
+            NSItemProvider(object: file.url as NSURL)
         }
     }
 }

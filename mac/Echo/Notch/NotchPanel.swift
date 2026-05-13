@@ -24,6 +24,8 @@ final class NotchPanel: NSPanel {
     nonisolated(unsafe) private var globalCursorMonitor: Any?
     /// Local monitor — fires while `ignoresMouseEvents = false` (pill active).
     nonisolated(unsafe) private var localCursorMonitor:  Any?
+    /// True while the user is dragging a file OUT of the tray (started inside the pill).
+    private var isDragOutInFlight: Bool = false
 
     private var menuRevealHoverStart:      Date?
     private var flatFullscreenRevealLatched = false
@@ -103,11 +105,27 @@ final class NotchPanel: NSPanel {
             DispatchQueue.main.async { self?.updateMousePassthrough() }
         }
 
-        // Local: fires when ignoresMouseEvents = false (pill is active, cursor in our window)
+        // Local: fires when ignoresMouseEvents = false (pill is active, cursor in our window).
+        // Also captures leftMouseDragged/leftMouseUp to detect drag-out sessions — AppKit
+        // delivers these locally until mouse-up even after the cursor leaves the window.
         localCursorMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.mouseMoved, .mouseExited]
+            matching: [.mouseMoved, .mouseExited, .leftMouseDragged, .leftMouseUp]
         ) { [weak self] event in
-            DispatchQueue.main.async { self?.updateMousePassthrough() }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch event.type {
+                case .leftMouseDragged:
+                    let windowPt = self.convertPoint(fromScreen: NSEvent.mouseLocation)
+                    if !self.currentPillRect().insetBy(dx: -4, dy: -4).contains(windowPt) {
+                        self.isDragOutInFlight = true
+                    }
+                case .leftMouseUp:
+                    self.isDragOutInFlight = false
+                default:
+                    break
+                }
+                self.updateMousePassthrough()
+            }
             return event
         }
     }
@@ -146,11 +164,12 @@ final class NotchPanel: NSPanel {
         let overPill   = pillRect.contains(windowPt)
         let dragActive = viewModel.tray.isDragInFlight
 
-        // Accept events only when cursor is directly over the pill or a drag is
-        // in flight. currentPillRect() already returns open-pill bounds when
-        // notchState == .open, so the open-state margin outside the pill stays
-        // transparent — clicks reach Chrome tabs / Xcode windows behind us.
-        let shouldAccept = overPill || dragActive
+        // Accept events only when cursor is directly over the pill, an external drag
+        // is in flight, or the user is dragging a file OUT of the tray. currentPillRect()
+        // already returns open-pill bounds when notchState == .open, so the open-state
+        // margin outside the pill stays transparent — clicks reach Chrome tabs / Xcode
+        // windows behind us.
+        let shouldAccept = overPill || dragActive || isDragOutInFlight
         let newIgnore    = !shouldAccept
 
         if ignoresMouseEvents != newIgnore {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Echo is a macOS-only clipboard manager (similar to Paste.app). It runs as a menu-bar-only app (`LSUIElement = true`) with no dock icon.
+Echo is a macOS-only menu-bar app (`LSUIElement = true`, no dock icon) combining a clipboard manager, an app launcher, and a notch panel.
 
 - **Language:** Swift 6 (`SWIFT_VERSION = 6.0`)
 - **SDK:** macOS only (`SDKROOT = macosx`, deployment target 26.4)
@@ -17,9 +17,6 @@ Open `Echo.xcodeproj` in Xcode and run (⌘R). No Swift Package dependencies.
 ```bash
 # CLI build
 xcodebuild -project Echo.xcodeproj -scheme Echo -configuration Debug
-
-# CLI test (add a test target first)
-xcodebuild test -project Echo.xcodeproj -scheme Echo -destination 'platform=macOS'
 ```
 
 ## Architecture
@@ -27,29 +24,43 @@ xcodebuild test -project Echo.xcodeproj -scheme Echo -destination 'platform=macO
 ```
 Echo/
 ├── EchoApp.swift              # @main; NSApplicationDelegateAdaptor → AppDelegate; Settings scene
-├── AppDelegate.swift          # Wires up all subsystems; owns status bar + global hotkey
-├── ClipViewModel.swift        # @Observable @MainActor; drives UI; bridges monitor ↔ store ↔ panel
-├── ContentView.swift          # Settings window: accessibility permission onboarding UI
+├── AppDelegate.swift          # Wires all subsystems; status bar; two HotkeyManagers; app-launch tracking
+├── ClipViewModel.swift        # @Observable; bridges ClipboardMonitor ↔ ClipStore ↔ UI
+├── ContentView.swift          # Accessibility permission onboarding UI
 │
-├── Models/
-│   └── Clip.swift             # Clip struct (Sendable); ClipContentType enum; Date.relativeFormatted
+├── Models/Clip.swift          # Clip struct (Sendable); ClipContentType enum
+├── Clipboard/                 # ClipboardMonitor (500ms poll) + AppMetadataCapture (AX API)
+├── Database/ClipStore.swift   # `actor`; raw SQLite3; save / fetchRecent / delete
 │
-├── Clipboard/
-│   ├── ClipboardMonitor.swift # Polls NSPasteboard every 500 ms; captures clips; calls store.save + onNewClip
-│   └── AppMetadataCapture.swift # AX API → focused window title; NSWorkspace → front app
+├── UI/                        # ClipboardPanel (NSPanel), ClipDashboardView, ClipCardView
 │
-├── Database/
-│   └── ClipStore.swift        # `actor`; raw SQLite3; save / fetchRecent / delete
+├── Launcher/                  # App launcher (DynamicIsland-style)
+│   ├── DynamicIslandWindow.swift  # Transparent NSPanel; morphs in SwiftUI; keyboard nav
+│   ├── LauncherViewModel.swift    # Search across apps + browser tabs; clipboard panel toggle
+│   ├── AppSearchEngine.swift      # Indexes installed apps; usage-frequency ranking
+│   ├── HotkeyManager.swift        # Carbon hotkey registration
+│   ├── LauncherSettings.swift     # UserDefaults-backed hotkey persistence; onChange callbacks
+│   ├── AppInfo.swift              # App metadata struct
+│   └── DynamicIslandView.swift    # SwiftUI search UI inside the island shape
 │
-├── UI/
-│   ├── ClipboardPanel.swift   # NSPanel subclass (.nonactivatingPanel); spring slide-up animation
-│   ├── ClipDashboardView.swift# Horizontal LazyHStack of ClipCardViews; glassmorphism background
-│   └── ClipCardView.swift     # Per-clip card; image/text/RTF preview; drag via .onDrag; hover spring
+├── Browser/                   # Browser tab access via AppleScript (Safari, Chrome, Arc)
+│   ├── BrowserTabEngine.swift # fetchTabs / focusTab via NSAppleScript on dedicated queue
+│   ├── BrowserTabStore.swift  # actor; SQLite persistence of tab history
+│   └── BrowserTab.swift       # Tab model struct
 │
-├── Permissions/
-│   └── AccessibilityPermission.swift # AXIsProcessTrusted wrapper; background polling until granted
+├── Notch/                     # Menu-bar notch pill (always visible, level .mainMenu+3)
+│   ├── NotchPanel.swift       # NSPanel; ignoresMouseEvents toggle; drag detection
+│   ├── NotchViewModel.swift   # State (closed/open); module priority (Tray > Clock)
+│   ├── NotchView.swift        # SwiftUI pill UI
+│   ├── NotchLayoutGuide.swift # @Observable topInset; posts .echoNotchTopInsetDidChange
+│   ├── NotchSizing.swift      # Notch geometry; screen detection; fullscreen suppression
+│   ├── GlobalDragMonitor.swift# System-wide drag tracking for tray drop zone
+│   ├── Modules/               # NotchModule protocol; TrayModule; ClockModule
+│   └── MediaRemote/           # Now-playing info via MediaRemote private framework
 │
-└── Info.plist                 # LSUIElement=true; NSAccessibilityUsageDescription
+├── Dashboard/DashboardView.swift  # NavigationSplitView: Launcher settings, Clipboard history, About
+├── Permissions/AccessibilityPermission.swift
+└── Info.plist
 ```
 
 ### Data flow
@@ -58,38 +69,51 @@ Echo/
 NSPasteboard ──poll 500ms──▶ ClipboardMonitor ──save──▶ ClipStore (actor/SQLite)
                                     │
                                onNewClip
-                                    │
                                     ▼
                             ClipViewModel.loadClips() ──fetchRecent──▶ ClipStore
                                     │
-                              @Observable → SwiftUI auto-updates
+                              @Observable → SwiftUI
                                     │
-                            ClipboardPanel (NSPanel) ── hosts ──▶ ClipDashboardView
-                                                                         │
-                                                                   ClipCardView
-                                                                   .onTapGesture → viewModel.copy(clip)
-                                                                   .onDrag       → clip.itemProvider
+                     ┌──────────────┴──────────────┐
+                     ▼                             ▼
+             ClipboardPanel                 DynamicIslandWindow
+             (ClipDashboardView)            (DynamicIslandView)
+                                                   │
+                                            LauncherViewModel
+                                            ├── AppSearchEngine
+                                            └── BrowserTabEngine ──▶ BrowserTabStore
+
+NSWorkspace.didActivateApplication ──▶ LauncherViewModel.recordSystemActivation()
+                                        (keeps frequency rankings current)
 ```
 
 ### Key design decisions
 
-**`NSPanel` with `.nonactivatingPanel`**: The panel never becomes the key window, so the previously active app (e.g. VS Code) stays focused — this is what makes drag-and-drop out of the panel seamless.
+**Two `HotkeyManager` instances**: `AppDelegate` owns `hotkeyManager` (id 1, launcher) and `clipHotkeyManager` (id 2, clipboard panel). Both use Carbon hotkey registration. Escape is handled separately via `NSEvent.addGlobalMonitorForEvents`. Hotkeys are user-configurable and stored in `LauncherSettings` (UserDefaults).
 
-**`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`**: Every class/struct/enum is implicitly `@MainActor`. The explicit annotation in the code is redundant but kept for clarity. Only `actor ClipStore` and `nonisolated` functions opt out.
+**`DynamicIslandWindow` as transparent passthrough**: baseline `ignoresMouseEvents = true`; hover-guard via `acceptsMouseMovedEvents` lifts on first mouse move so accidental-hover on show is suppressed. The island shape is drawn entirely in SwiftUI — the window frame never changes. Always uses `.darkAqua` appearance regardless of system theme.
 
-**`ClipStore.db` as `nonisolated(unsafe)`**: SQLite is initialized synchronously in `init()` (which is `nonisolated` in Swift 6). After init, all access flows through the actor's serial executor, so thread safety is upheld by design.
+**`NotchPanel` click-through**: `ignoresMouseEvents = true` by default (OS-level guarantee — window server skips it). Toggled to `false` only when cursor enters the pill rect. A secondary `PillHostingView.hitTest` guard ensures transparent margins inside the open pill also pass through. Level is `.mainMenu + 3` so it sits above the menu bar.
 
-**Suppress re-capture**: `ClipboardMonitor.suppressNextCapture()` is called before programmatic pasteboard writes (in `ClipViewModel.copy`) so the monitor ignores the resulting change event and doesn't create a duplicate history entry.
+**`NotchLayoutGuide` coordination**: when the notch pill expands, `NotchPanel.applyScreenLayout()` calls `layoutGuide.setTopInset(...)` which posts `.echoNotchTopInsetDidChange`. `DynamicIslandWindow` observes this notification and calls `reposition()` to shift down, so the launcher never overlaps the open pill.
 
-**Spring animation**: `ClipboardPanel.show()` uses `CAMediaTimingFunction(controlPoints: 0.34, 1.56, 0.64, 1.0)` — a cubic-bezier approximation of a spring with slight overshoot.
+**`BrowserTabEngine` on dedicated queue**: `NSAppleScript` must not run on `MainActor`. All AppleScript execution uses `DispatchQueue(label: "echo.applescript", qos: .userInitiated)` with `withCheckedThrowingContinuation`. Tab data is cached in-memory; `BrowserTabStore` persists history so closed tabs remain searchable.
+
+**`NSPanel` with `.nonactivatingPanel`**: `ClipboardPanel` never becomes the key window, keeping the previously active app (e.g. VS Code) focused — what makes drag-and-drop out of the panel seamless.
+
+**Suppress re-capture**: `ClipboardMonitor.suppressNextCapture()` is called before programmatic pasteboard writes (`ClipViewModel.copy`) to avoid duplicate history entries.
+
+**`ClipStore.db` as `nonisolated(unsafe)`**: SQLite is initialized synchronously in `init()` (which is `nonisolated` in Swift 6). All subsequent access flows through the actor's serial executor.
+
+**Notch module priority**: `NotchViewModel.activeModule` follows: (1) drag in flight → Tray forced; (2) first module where `isActive == true`; (3) Clock fallback (peek-on-hover, reports `isActive == false`).
 
 ### Permissions
 
 The app requests Accessibility access on first launch. Without it:
-- `AppMetadataCapture` silently returns `nil` for `windowTitle` (clips still capture app name + bundle ID)
-- `NSEvent.addGlobalMonitorForEvents` is registered but receives no events until the user grants access in **System Settings → Privacy & Security → Accessibility**
+- `AppMetadataCapture` returns `nil` for `windowTitle`
+- `NSEvent.addGlobalMonitorForEvents` receives no events
 
-The global hotkey (⌘⇧V) and Escape-to-close both rely on this permission.
+The global hotkeys and Escape-to-close both rely on this permission.
 
 ### Adding new content types
 
@@ -97,3 +121,9 @@ The global hotkey (⌘⇧V) and Escape-to-close both rely on this permission.
 2. Handle capture in `ClipboardMonitor.capture(from:)`
 3. Add drag representation in `Clip.itemProvider`
 4. Add preview in `ClipCardView.contentArea`
+
+### Adding a new notch module
+
+1. Conform to `NotchModule` protocol in `Notch/Modules/`
+2. Add an instance to `NotchViewModel` and include it in `modules`
+3. Module priority is determined by position in the `modules` array
