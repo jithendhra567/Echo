@@ -16,7 +16,7 @@ enum NotchSizing {
     static let openSize = CGSize(width: 620, height: 248)
 
     /// Padding from the top of the open pill to content (clears hardware notch / curve).
-    static let openContentTopInset: CGFloat = 14
+    static let openContentTopInset: CGFloat = 8
 
     /// Side inset for open module content (clock / tray).
     static let openContentHorizontalInset: CGFloat = 26

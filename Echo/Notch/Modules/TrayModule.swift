@@ -26,6 +26,9 @@ final class TrayModule: NotchModule {
     let id           = "tray"
     let title        = "Tray"
     let iconName     = "tray.and.arrow.down.fill"
+    /// Open tray already lists files — hide the duplicate closed strip to save vertical space.
+    var showsClosedHeaderInOpen: Bool { false }
+
     let supportsDrop = true
 
     var isActive: Bool { isDragInFlight || !files.isEmpty }
@@ -212,7 +215,7 @@ private struct TrayIconStack: View {
         let size:    CGFloat = 16
         ZStack(alignment: .leading) {
             ForEach(Array(shown.reversed().enumerated()), id: \.element.id) { i, file in
-                Image(nsImage: file.icon)
+                Image(nsImage: file.previewImage(maxSide: 28))
                     .resizable()
                     .interpolation(.high)
                     .frame(width: size, height: size)
@@ -246,20 +249,17 @@ private struct TrayOpenView: View {
     }
 
     private var dropImportControls: some View {
-        HStack(spacing: 8) {
-            Text("Drop")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.45))
-            Picker("Import", selection: $module.dropImportMode) {
-                ForEach(TrayDropImportMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
+        Picker("Copy or move", selection: $module.dropImportMode) {
+            ForEach(TrayDropImportMode.allCases) { mode in
+                Text(mode.title).tag(mode)
             }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
         }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .labelsHidden()
+        .accessibilityLabel("Copy or move dropped files")
         .padding(.horizontal, 2)
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
     }
 
     private var emptyState: some View {
@@ -298,9 +298,10 @@ private struct TrayFileCard: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 6) {
-                Image(nsImage: file.icon)
+                Image(nsImage: file.previewImage(maxSide: 88))
                     .resizable()
                     .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
                     .frame(width: 44, height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .shadow(color: .black.opacity(0.5), radius: 3, y: 2)
@@ -311,7 +312,7 @@ private struct TrayFileCard: View {
                     .truncationMode(.middle)
                     .frame(width: 66)
             }
-            .padding(.top, 4)
+            .padding(.top, 1)
             .frame(width: 72)
 
             Button {
