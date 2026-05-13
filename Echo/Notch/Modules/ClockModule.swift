@@ -3,12 +3,12 @@ import Observation
 import SwiftUI
 
 /// Default fallback module — used as the open-pill content when nothing else
-/// (Tray, Music) is active. **Reports `isActive == false`** so it does not
+/// (Tray) is active. **Reports `isActive == false`** so it does not
 /// surface itself in the closed pill: by default the closed state stays as
 /// the bare physical notch and the user reveals the clock by hovering.
 ///
-/// Open layout: time + date on the left; optional camera mirror on the right
-/// after an explicit click (camera never starts until then).
+/// Open layout: month grid on the left; time + date in the center column; optional
+/// camera mirror on the right after an explicit click (camera never starts until then).
 @Observable
 @MainActor
 final class ClockModule: NotchModule {
@@ -48,10 +48,13 @@ private enum ClockFormat {
 // MARK: - Open view
 
 private enum ClockNotchLayout {
+    /// Inset for the whole clock row inside the module bounds (adds to `openContentHorizontalInset`).
+    static let innerHorizontalPadding: CGFloat = 12
+    static let timeColumnMinWidth: CGFloat = 100
     /// 1:1 mirror preview / gate tap target (points).
-    static let mirrorSquare: CGFloat = 176
-    /// Center column for the month grid (points).
-    static let calendarWidth: CGFloat = 152
+    static let mirrorSquare: CGFloat = 156
+    /// Preferred width for the month grid (points); may shrink if space is tight.
+    static let calendarWidth: CGFloat = 138
     static let dividerWidth: CGFloat = 1
 }
 
@@ -89,7 +92,7 @@ private enum WeekendTint: Equatable {
     }
 }
 
-/// Compact month grid for the center of the open clock notch.
+/// Compact month grid for the leading column of the open clock notch.
 private struct NotchMiniCalendar: View {
     let now: Date
 
@@ -146,8 +149,8 @@ private struct NotchMiniCalendar: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 2)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     /// Weekday component (1…7, Sunday=1) for the given grid column index.
@@ -219,33 +222,37 @@ private struct ClockOpenView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             GeometryReader { geo in
-                let innerW = geo.size.width
+                let gutter = ClockNotchLayout.innerHorizontalPadding
+                let innerW = max(0, geo.size.width - gutter * 2)
                 let innerH = geo.size.height
                 let divW = ClockNotchLayout.dividerWidth
                 let mirrorW = ClockNotchLayout.mirrorSquare
                 let gap = NotchSizing.openClockInterColumnSpacing
                 let gapsTotal = gap * 4
-                let calW = min(ClockNotchLayout.calendarWidth, max(128, innerW - mirrorW - divW * 2 - gapsTotal - 96))
-                let timeW = max(100, innerW - mirrorW - calW - divW * 2 - gapsTotal)
+                let timeMin = ClockNotchLayout.timeColumnMinWidth
+                let maxCalendar = max(0, innerW - mirrorW - divW * 2 - gapsTotal - timeMin)
+                let calW = min(ClockNotchLayout.calendarWidth, max(112, maxCalendar))
+                let timeW = max(timeMin, innerW - mirrorW - calW - divW * 2 - gapsTotal)
 
-                HStack(alignment: .top, spacing: gap) {
-                    ClockSummaryColumn(now: ctx.date)
-                        .frame(width: timeW, height: innerH, alignment: .top)
+                HStack(alignment: .center, spacing: gap) {
+                    NotchMiniCalendar(now: ctx.date)
+                        .frame(width: calW, height: innerH, alignment: .center)
 
                     NotchClockDivider(maxHeight: innerH)
 
-                    NotchMiniCalendar(now: ctx.date)
-                        .frame(width: calW, height: innerH, alignment: .top)
+                    ClockSummaryColumn(now: ctx.date)
+                        .frame(width: timeW, height: innerH, alignment: .center)
 
                     NotchClockDivider(maxHeight: innerH)
 
                     ClockMirrorColumn(clock: clock, mirrorRevealed: $mirrorRevealed)
                         .frame(width: mirrorW, height: innerH, alignment: .center)
                 }
-                .frame(width: innerW, height: innerH, alignment: .center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, gutter)
             }
-            .padding(.vertical, 10)
-            .padding(.bottom, 6)
+            .padding(.vertical, 6)
+            .padding(.bottom, 4)
         }
         .onDisappear {
             mirrorRevealed = false
@@ -292,7 +299,7 @@ private struct ClockMirrorColumn: View {
                 mirrorActiveBody
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -381,21 +388,24 @@ private struct AnimatedClockTime: View {
     private var minute: Int { calendar.component(.minute, from: now) }
     private var second: Int { calendar.component(.second, from: now) }
 
-    private static let digitFont = Font.system(size: 34, weight: .semibold, design: .rounded)
+    private static let digitFont = Font.system(size: 30, weight: .semibold, design: .rounded)
     private static let rollAnimation = Animation.spring(response: 0.38, dampingFraction: 0.78)
 
     var body: some View {
         HStack(spacing: 0) {
-            digitPair(hour)
-            colon
-            digitPair(minute)
-            colon
-            digitPair(second)
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                digitPair(hour)
+                colon
+                digitPair(minute)
+                colon
+                digitPair(second)
+            }
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            Spacer(minLength: 0)
         }
-        .monospacedDigit()
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-        .frame(maxWidth: .infinity)
     }
 
     private var colon: some View {
@@ -437,22 +447,22 @@ private struct ClockSummaryColumn: View {
     }
 
     var body: some View {
-        VStack(alignment: .center, spacing: 14) {
+        VStack(alignment: .center, spacing: 8) {
             Text(greeting)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.58))
                 .multilineTextAlignment(.center)
 
             AnimatedClockTime(now: now)
 
             Text(ClockFormat.fullDate.string(from: now))
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.78))
                 .lineLimit(2)
                 .minimumScaleFactor(0.75)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }

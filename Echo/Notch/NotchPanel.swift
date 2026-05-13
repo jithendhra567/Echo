@@ -75,7 +75,6 @@ final class NotchPanel: NSPanel {
     }
 
     func start() {
-        viewModel.start()
         applyScreenLayout()
 
         screenChangeObserver = NotificationCenter.default.addObserver(

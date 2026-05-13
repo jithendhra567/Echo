@@ -24,7 +24,7 @@ struct NotchView: View {
     @State private var closeTask: Task<Void, Never>?
     @State private var openHoverTask: Task<Void, Never>?
 
-    /// Debounce when a module has content to surface (tray files / music playing).
+    /// Debounce when a module has content to surface (tray files).
     private static let openHoverDebounceActive: Duration  = .milliseconds(200)
     /// Longer debounce when idle so cursor passes near the notch to reach app
     /// windows below (e.g. Chrome tabs) do not accidentally expand the pill.
@@ -93,7 +93,7 @@ struct NotchView: View {
 
             if isOpen {
                 openContent(module: module)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -101,6 +101,8 @@ struct NotchView: View {
         .background(Color.black)
         .compositingGroup()
         .clipShape(shape)
+        .shadow(color: .black.opacity(isOpen ? 0.16 : 0), radius: isOpen ? 26 : 0, x: 0, y: isOpen ? 12 : 0)
+        .shadow(color: .black.opacity(isOpen ? 0.048 : 0), radius: isOpen ? 118 : 0, x: 0, y: isOpen ? 40 : 0)
         .contentShape(Rectangle())          // ← cheap rect hit-test for hover
         .animation(activeSpring, value: vm.notchState)
         .animation(activeSpring, value: width)
@@ -141,50 +143,11 @@ struct NotchView: View {
 
     @ViewBuilder
     private func openContent(module: any NotchModule) -> some View {
-        VStack(spacing: 0) {
-            module.openView
-                .padding(.top, NotchSizing.openContentTopInset)
-                .padding(.horizontal, NotchSizing.openContentHorizontalInset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            if vm.modules.count > 1 {
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1)
-                    .padding(.horizontal, NotchSizing.openContentHorizontalInset + 4)
-                Color.clear.frame(height: 6)
-                tabStrip(active: module)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .transition(.opacity)
-    }
-
-    @ViewBuilder
-    private func tabStrip(active: any NotchModule) -> some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-            HStack(spacing: 32) {
-                ForEach(vm.modules, id: \.id) { m in
-                    let isActive = m.id == active.id
-                    Button {
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                            vm.selectModule(id: m.id)
-                        }
-                    } label: {
-                        Image(systemName: m.iconName)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(isActive ? 1 : 0.44))
-                            .frame(width: 44, height: 38)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 6)
-        .padding(.bottom, 8)
+        module.openView
+            .padding(.top, NotchSizing.openContentTopInset)
+            .padding(.horizontal, NotchSizing.openContentHorizontalInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .transition(.opacity)
     }
 
     // MARK: - Sizing
@@ -253,9 +216,8 @@ struct NotchView: View {
 
     private func routeDrop(providers: [NSItemProvider], module: any NotchModule) -> Bool {
         // Drops always go to the tray — drag dropping a file shouldn't be
-        // lost just because Music is the focused tab.
+        // lost just because another module tab is focused.
         if vm.tray.handleDrop(providers: providers) {
-            vm.selectModule(id: vm.tray.id)
             return true
         }
         return module.handleDrop(providers: providers)

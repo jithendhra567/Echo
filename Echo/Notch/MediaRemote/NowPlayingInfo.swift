@@ -19,7 +19,11 @@ struct NowPlayingInfo: Equatable, Sendable {
     /// True when there's any registered media client — even if paused. We surface
     /// the module while a track is loaded so the user can resume from the notch.
     var hasContent: Bool {
-        title != nil || artist != nil || album != nil
+        if let t = title, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let a = artist, !a.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let al = album, !al.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let d = artworkData, !d.isEmpty { return true }
+        return false
     }
 
     var artworkImage: NSImage? {

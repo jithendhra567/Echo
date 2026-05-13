@@ -3,6 +3,21 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// How dropped **file** URLs are brought into Echo’s on-disk shelf folder.
+enum TrayDropImportMode: String, CaseIterable, Identifiable, Sendable {
+    case copy
+    case move
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .copy: return "Copy"
+        case .move: return "Move"
+        }
+    }
+}
+
 /// File-shelf module.
 @Observable
 @MainActor
@@ -19,8 +34,61 @@ final class TrayModule: NotchModule {
     var isDragInFlight:    Bool       = false
     var isDropHighlighted: Bool       = false
 
+    /// Finder drops: copy duplicates into the shelf; move relocates into the shelf.
+    var dropImportMode: TrayDropImportMode = .copy
+
     /// Host callback for when we need to surface ourselves to the user.
     var onContentChanged: (() -> Void)?
+
+    // MARK: - Shelf storage
+
+    private static func shelfDirectoryURL() throws -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = base.appendingPathComponent("Echo/TrayShelf", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private func shelfPathNormalized() throws -> String {
+        try Self.shelfDirectoryURL().resolvingSymlinksInPath().path
+    }
+
+    private func isUnderShelf(_ url: URL) -> Bool {
+        guard let shelf = try? shelfPathNormalized() else { return false }
+        let p = url.resolvingSymlinksInPath().path
+        return p == shelf || p.hasPrefix(shelf + "/")
+    }
+
+    private static func uniqueFileName(preferred: String, in directory: URL) -> String {
+        let fm = FileManager.default
+        var candidate = preferred
+        var n = 0
+        let base = (preferred as NSString).deletingPathExtension
+        let ext = (preferred as NSString).pathExtension
+        while fm.fileExists(atPath: directory.appendingPathComponent(candidate).path) {
+            n += 1
+            candidate = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"
+        }
+        return candidate
+    }
+
+    /// Resolves a dropped file URL to a shelf URL (copy/move) or returns non-file URLs unchanged.
+    private func resolvedShelfURL(from source: URL) throws -> URL {
+        guard source.isFileURL else { return source }
+        if isUnderShelf(source) { return source }
+
+        let shelf = try Self.shelfDirectoryURL()
+        let name = Self.uniqueFileName(preferred: source.lastPathComponent, in: shelf)
+        let dest = shelf.appendingPathComponent(name, isDirectory: false)
+
+        switch dropImportMode {
+        case .copy:
+            try FileManager.default.copyItem(at: source, to: dest)
+        case .move:
+            try FileManager.default.moveItem(at: source, to: dest)
+        }
+        return dest
+    }
 
     // MARK: - File operations
 
@@ -34,6 +102,10 @@ final class TrayModule: NotchModule {
     }
 
     func remove(id: UUID) {
+        guard let file = files.first(where: { $0.id == id }) else { return }
+        if isUnderShelf(file.url) {
+            try? FileManager.default.removeItem(at: file.url)
+        }
         files.removeAll { $0.id == id }
         onContentChanged?()
     }
@@ -65,12 +137,20 @@ final class TrayModule: NotchModule {
                 loaded = true
                 p.loadItem(forTypeIdentifier: tid, options: nil) { [weak self] item, _ in
                     let url: URL?
-                    if      let u = item as? URL                                 { url = u }
-                    else if let d = item as? Data                                { url = URL(dataRepresentation: d, relativeTo: nil) }
-                    else if let s = item as? String, let u = URL(string: s)      { url = u }
-                    else                                                         { url = nil }
+                    if      let u = item as? URL                            { url = u }
+                    else if let d = item as? Data                           { url = URL(dataRepresentation: d, relativeTo: nil) }
+                    else if let s = item as? String, let u = URL(string: s) { url = u }
+                    else                                                    { url = nil }
                     guard let url, url.isFileURL || url.scheme != nil else { return }
-                    Task { @MainActor in self?.addFiles([url]) }
+                    Task { @MainActor in
+                        guard let self else { return }
+                        do {
+                            let shelfURL = try self.resolvedShelfURL(from: url)
+                            self.addFiles([shelfURL])
+                        } catch {
+                            // Move can fail (permissions / volume); copy may still fail — ignore silently.
+                        }
+                    }
                 }
                 break
             }
@@ -151,10 +231,11 @@ private struct TrayIconStack: View {
 // MARK: - Open view
 
 private struct TrayOpenView: View {
-    let module: TrayModule
+    @Bindable var module: TrayModule
 
     var body: some View {
         VStack(spacing: 0) {
+            dropImportControls
             if module.files.isEmpty {
                 emptyState
             } else {
@@ -164,15 +245,32 @@ private struct TrayOpenView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var dropImportControls: some View {
+        HStack(spacing: 8) {
+            Text("Drop")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.45))
+            Picker("Import", selection: $module.dropImportMode) {
+                ForEach(TrayDropImportMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 2)
+        .padding(.bottom, 6)
+    }
+
     private var emptyState: some View {
         let glow = module.isDropHighlighted
-        return VStack(spacing: 6) {
+        return VStack(spacing: 4) {
             Image(systemName: "tray.and.arrow.down.fill")
-                .font(.system(size: 24, weight: .regular))
+                .font(.system(size: 20, weight: .regular))
                 .foregroundStyle(.white.opacity(glow ? 0.95 : 0.55))
                 .symbolEffect(.bounce, value: glow)
             Text("Drop files here")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(glow ? 0.95 : 0.65))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -187,8 +285,8 @@ private struct TrayOpenView: View {
                 }
                 TrayMorePlaceholder(highlighted: module.isDropHighlighted)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
         }
     }
 }

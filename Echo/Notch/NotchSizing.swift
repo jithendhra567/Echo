@@ -4,32 +4,36 @@ import CoreGraphics
 /// Central sizing constants — single source of truth for the entire notch
 /// subsystem. Mirrors `sizing/matters.swift` in TheBoredTeam/boring.notch.
 enum NotchSizing {
-    /// Padding around the window to make room for shadow / overshoot.
-    static let shadowPadding: CGFloat = 20
+    /// Horizontal padding **each side** of the open pill inside the panel window.
+    /// Must cover SwiftUI `.shadow` blur extent (~radius past the shape) or the
+    /// OS clips the shadow and you get a hard rectangular “border”.
+    static let openShadowSidePadding: CGFloat = 112
 
-    /// The exact frame the pill occupies when expanded (height fits clock +
-    /// mirror column, tab strip, and insets).
-    static let openSize = CGSize(width: 620, height: 272)
+    /// Padding **below** the open pill (pill is top-aligned in the window).
+    static let openShadowBottomPadding: CGFloat = 168
+
+    /// The exact frame the pill occupies when expanded (clock / tray content and insets).
+    static let openSize = CGSize(width: 620, height: 248)
 
     /// Padding from the top of the open pill to content (clears hardware notch / curve).
-    static let openContentTopInset: CGFloat = 22
+    static let openContentTopInset: CGFloat = 14
 
-    /// Side inset for open module content (clock / tray / music).
-    static let openContentHorizontalInset: CGFloat = 28
+    /// Side inset for open module content (clock / tray).
+    static let openContentHorizontalInset: CGFloat = 26
 
     /// Horizontal space between clock, calendar, and mirror in `ClockOpenView`.
-    static let openClockInterColumnSpacing: CGFloat = 14
+    static let openClockInterColumnSpacing: CGFloat = 10
 
     /// Expanded pill height plus shadow band and clearance — `NotchLayoutGuide` / launcher use this.
     static var expandedPillHeight: CGFloat {
-        openSize.height + shadowPadding + 16
+        openSize.height + openShadowBottomPadding + 16
     }
 
     /// Total NSWindow size — wide enough to contain the maximum open pill plus
     /// shadow room. The window itself never resizes, only its SwiftUI content.
     static let windowSize = CGSize(
-        width:  openSize.width  + shadowPadding * 2,
-        height: openSize.height + shadowPadding
+        width:  openSize.width  + openShadowSidePadding * 2,
+        height: openSize.height + openShadowBottomPadding
     )
 
     /// Corner radii at both notch states. Both interpolate via NotchShape.

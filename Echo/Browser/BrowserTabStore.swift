@@ -27,10 +27,9 @@ actor BrowserTabStore {
             INSERT INTO browser_tabs (url, title, browser, last_seen, expires_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(url) DO UPDATE SET
-                title      = excluded.title,
-                browser    = excluded.browser,
-                last_seen  = excluded.last_seen,
-                expires_at = excluded.expires_at;
+                title     = excluded.title,
+                browser   = excluded.browser,
+                last_seen = excluded.last_seen;
         """
         prepare(db: db, sql: sql) { stmt in
             bindText(stmt, 1, tab.url)
