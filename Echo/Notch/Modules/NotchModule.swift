@@ -23,6 +23,10 @@ protocol NotchModule: AnyObject {
     /// the tiny one in the closed bar).
     var showsClosedHeaderInOpen: Bool { get }
 
+    /// Width of the pill when `notchState == .open` (must match `NotchPanel`
+    /// hit-testing and `ignoresMouseEvents` math).
+    var openExpandedWidth: CGFloat { get }
+
     /// SwiftUI fragments rendered by `NotchView` inside the pill chrome.
     var closedLeft:   AnyView { get }
     var closedRight:  AnyView { get }
@@ -41,4 +45,5 @@ extension NotchModule {
     var closedCenter:            AnyView { AnyView(EmptyView()) }
     var closedExtraWidth:        CGFloat { 90 }
     var showsClosedHeaderInOpen: Bool    { true }
+    var openExpandedWidth:       CGFloat { NotchSizing.openSize.width }
 }

@@ -104,9 +104,9 @@ actor AppSearchEngine {
             return Array(
                 allApps
                     .sorted { lhs, rhs in
-                        if lhs.usageCount != rhs.usageCount {
-                            return lhs.usageCount > rhs.usageCount
-                        }
+                        let lu = usageCounts[lhs.bundleIdentifier ?? ""] ?? 0
+                        let ru = usageCounts[rhs.bundleIdentifier ?? ""] ?? 0
+                        if lu != ru { return lu > ru }
                         let ldep = isDeprioritizedLauncherApp(lhs)
                         let rdep = isDeprioritizedLauncherApp(rhs)
                         if ldep != rdep { return !ldep }
@@ -120,16 +120,16 @@ actor AppSearchEngine {
         let scored: [(AppInfo, Int)] = allApps.compactMap { app in
             guard let score = nameScore(query: q, name: app.name.lowercased()) else { return nil }
             let uses = usageCounts[app.bundleIdentifier ?? ""] ?? 0
-            let usageBoost = Int(log2(Double(uses) + 1) * 200)
-            let deprioritizePenalty = isDeprioritizedLauncherApp(app) ? 3_500 : 0
+            // Linear boost: each launch adds 1 000 pts — strong enough that 2 uses of a
+            // subsequence-match (2 500) beats a never-opened substring-match (2 000), and
+            // 5 uses of a subsequence-match (5 500) beats a never-opened prefix-match (5 000).
+            let usageBoost          = uses * 1_000
+            let deprioritizePenalty = isDeprioritizedLauncherApp(app) ? 15_000 : 0
             return (app, score + usageBoost - deprioritizePenalty)
         }
         return scored
             .sorted { lhs, rhs in
                 if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
-                let ldep = isDeprioritizedLauncherApp(lhs.0)
-                let rdep = isDeprioritizedLauncherApp(rhs.0)
-                if ldep != rdep { return !ldep }
                 return lhs.0.name.lowercased() < rhs.0.name.lowercased()
             }
             .prefix(5)
@@ -143,20 +143,21 @@ actor AppSearchEngine {
     }
 
     // MARK: - Scoring
-    // Tiers (descending) — all comparisons are space-stripped + lowercased:
-    //   10 000  exact match
-    //    5 000  name starts with query
-    //    2 000  name contains query as substring
-    //      500  query is a subsequence of name (chars appear in order)
+    // Base tiers (space-stripped, lowercased). Usage adds 1 000 per launch on top,
+    // so the ordering within each non-exact tier flips once the app has been used:
+    //   100 000  exact match          — always wins regardless of usage
+    //     5 000  name starts with query
+    //     2 000  name contains query as substring
+    //       500  query is a subsequence of name (chars appear in order)
 
     private func nameScore(query: String, name: String) -> Int? {
         let q = query.filter { !$0.isWhitespace }
         let n = name.lowercased().filter { !$0.isWhitespace }
 
-        if n == q                   { return 10_000 }
-        if n.hasPrefix(q)           { return  5_000 + lengthBonus(name) }
-        if n.contains(q)            { return  2_000 + lengthBonus(name) }
-        if isSubsequence(q, in: n)  { return    500 + lengthBonus(name) }
+        if n == q                  { return 100_000 }
+        if n.hasPrefix(q)          { return   5_000 }
+        if n.contains(q)           { return   2_000 }
+        if isSubsequence(q, in: n) { return     500 }
         return nil
     }
 
@@ -168,6 +169,4 @@ actor AppSearchEngine {
         }
         return qi == query.endIndex
     }
-
-    private func lengthBonus(_ name: String) -> Int { max(0, 80 - name.count) }
 }

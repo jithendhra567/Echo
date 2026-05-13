@@ -14,6 +14,8 @@ import SwiftUI
 final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     let viewModel = LauncherViewModel()
     private let clipViewModel: ClipViewModel
+    private let notchLayoutGuide: NotchLayoutGuide
+    nonisolated(unsafe) private var topInsetObserver: NSObjectProtocol?
     private var previousApp: NSRunningApplication?
     private var localKeyMonitor: Any?
     private var hideTask: Task<Void, Never>?
@@ -21,8 +23,9 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     static let windowSize = CGSize(width: 860, height: 600)
 
-    init(clipViewModel: ClipViewModel) {
+    init(clipViewModel: ClipViewModel, notchLayoutGuide: NotchLayoutGuide) {
         self.clipViewModel = clipViewModel
+        self.notchLayoutGuide = notchLayoutGuide
         super.init(
             contentRect: NSRect(origin: .zero, size: Self.windowSize),
             styleMask: [.borderless, .fullSizeContentView],
@@ -38,6 +41,19 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         viewModel.onDismiss = { [weak self] in self?.hide() }
         viewModel.onLaunch  = { [weak self] in self?.hideAfterLaunch() }
         viewModel.clipVM    = clipViewModel
+
+        topInsetObserver = NotificationCenter.default.addObserver(
+            forName: .echoNotchTopInsetDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.isShowing else { return }
+            self.reposition()
+        }
+    }
+
+    deinit {
+        if let o = topInsetObserver { NotificationCenter.default.removeObserver(o) }
     }
 
     private func configure() {
@@ -60,8 +76,9 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     func reposition() {
         guard let screen = NSScreen.main else { return }
         let x = screen.frame.midX - Self.windowSize.width / 2
-        // ~28 % from top of visible area — Spotlight-style
-        let y = screen.visibleFrame.maxY - screen.visibleFrame.height * 0.28 - Self.windowSize.height
+        // ~28 % from top of visible area — Spotlight-style; shift down when the notch pill is expanded.
+        let baseY = screen.visibleFrame.maxY - screen.visibleFrame.height * 0.28 - Self.windowSize.height
+        let y = baseY - notchLayoutGuide.topInset
         setFrameOrigin(NSPoint(x: x, y: max(y, screen.visibleFrame.minY)))
     }
 

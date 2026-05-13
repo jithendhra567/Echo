@@ -3,6 +3,8 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let notchLayoutGuide = NotchLayoutGuide()
+
     private var store: ClipStore!
     private var monitor: ClipboardMonitor!
     private var viewModel: ClipViewModel!
@@ -22,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel        = ClipViewModel(store: store, monitor: monitor)
         panel            = ClipboardPanel(viewModel: viewModel)
         launcherSettings = LauncherSettings()
-        launcherPanel    = DynamicIslandWindow(clipViewModel: viewModel)
+        launcherPanel    = DynamicIslandWindow(clipViewModel: viewModel, notchLayoutGuide: notchLayoutGuide)
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
         monitor.onNewClip   = { [weak self] _ in self?.viewModel.loadClips() }
@@ -58,13 +60,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.setupGlobalHotkey()
         }
 
-        notchPanel = NotchPanel()
+        notchPanel = NotchPanel(layoutGuide: notchLayoutGuide)
         notchPanel.start()
 
         viewModel.loadClips()
         monitor.start()
         setupStatusBar()
         setupGlobalHotkey()
+        setupAppActivationTracking()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -111,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let content = DashboardView()
             .environment(launcherSettings)
             .environment(viewModel)
+            .environment(notchLayoutGuide)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 540),
@@ -142,6 +146,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if self.panel.isShowing { self.panel.hide() }
+            }
+        }
+    }
+
+    // MARK: - System-wide app-launch tracking
+
+    private func setupAppActivationTracking() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object:  nil,
+            queue:   .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  let bid = app.bundleIdentifier
+            else { return }
+            Task { @MainActor [weak self] in
+                self?.launcherPanel.viewModel.recordSystemActivation(bundleID: bid)
             }
         }
     }

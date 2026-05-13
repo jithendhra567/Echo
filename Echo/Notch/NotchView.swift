@@ -19,11 +19,16 @@ import UniformTypeIdentifiers
 ///   so quick cursor slips off the edge do not collapse.
 struct NotchView: View {
     @Environment(NotchViewModel.self) private var vm
+    @Environment(NotchLayoutGuide.self) private var notchLayout
     @State private var isDropTargeted = false
     @State private var closeTask: Task<Void, Never>?
     @State private var openHoverTask: Task<Void, Never>?
 
-    private static let openHoverDebounce: Duration = .milliseconds(200)
+    /// Debounce when a module has content to surface (tray files / music playing).
+    private static let openHoverDebounceActive: Duration  = .milliseconds(200)
+    /// Longer debounce when idle so cursor passes near the notch to reach app
+    /// windows below (e.g. Chrome tabs) do not accidentally expand the pill.
+    private static let openHoverDebounceIdle:   Duration  = .milliseconds(500)
 
     private var openSpring: Animation {
         let s = NotchSizing.Spring.open
@@ -48,18 +53,24 @@ struct NotchView: View {
         let dropTypes: [UTType] = [.fileURL, .url]
 
         ZStack(alignment: .top) {
-            // Click-through canvas. SwiftUI hit-test returns nil for these
-            // points, so the menu bar / app behind us stay reachable.
+            // Background fills the window so the ZStack has a defined size;
+            // hit-testing is handled at the NSHostingView level (PillHostingView).
             Color.clear.allowsHitTesting(false)
 
             pill(module: module, moduleHot: moduleHot)
+                .onChange(of: isDropTargeted) { _, t in module.setDropTargeted(t) }
+                .onDrop(of: dropTypes, isTargeted: $isDropTargeted) { providers in
+                    routeDrop(providers: providers, module: module)
+                }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
-        .onChange(of: isDropTargeted) { _, t in module.setDropTargeted(t) }
-        .onDrop(of: dropTypes, isTargeted: $isDropTargeted) { providers in
-            routeDrop(providers: providers, module: module)
-        }
+        .onAppear { syncEchoChromeTopInset() }
+        .onChange(of: vm.notchState) { _, _ in syncEchoChromeTopInset() }
+    }
+
+    private func syncEchoChromeTopInset() {
+        notchLayout.setTopInset(vm.notchState == .open ? NotchSizing.expandedPillHeight : 0)
     }
 
     // MARK: - The pill
@@ -82,13 +93,13 @@ struct NotchView: View {
 
             if isOpen {
                 openContent(module: module)
-                    .padding(.horizontal, NotchSizing.Corners.openBottom)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 8)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(width: width, height: height, alignment: .top)
         .background(Color.black)
+        .compositingGroup()
         .clipShape(shape)
         .contentShape(Rectangle())          // ← cheap rect hit-test for hover
         .animation(activeSpring, value: vm.notchState)
@@ -132,9 +143,17 @@ struct NotchView: View {
     private func openContent(module: any NotchModule) -> some View {
         VStack(spacing: 0) {
             module.openView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, NotchSizing.openContentTopInset)
+                .padding(.horizontal, NotchSizing.openContentHorizontalInset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             if vm.modules.count > 1 {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, NotchSizing.openContentHorizontalInset + 4)
+                Color.clear.frame(height: 6)
                 tabStrip(active: module)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .transition(.opacity)
@@ -142,25 +161,30 @@ struct NotchView: View {
 
     @ViewBuilder
     private func tabStrip(active: any NotchModule) -> some View {
-        HStack(spacing: 14) {
-            ForEach(vm.modules, id: \.id) { m in
-                let isActive = m.id == active.id
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        vm.selectModule(id: m.id)
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            HStack(spacing: 32) {
+                ForEach(vm.modules, id: \.id) { m in
+                    let isActive = m.id == active.id
+                    Button {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                            vm.selectModule(id: m.id)
+                        }
+                    } label: {
+                        Image(systemName: m.iconName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(isActive ? 1 : 0.44))
+                            .frame(width: 44, height: 38)
+                            .contentShape(Rectangle())
                     }
-                } label: {
-                    Image(systemName: m.iconName)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white.opacity(isActive ? 0.95 : 0.35))
-                        .frame(width: 18, height: 14)
-                        .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            Spacer(minLength: 0)
         }
-        .frame(height: 14)
-        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Sizing
@@ -171,7 +195,7 @@ struct NotchView: View {
     /// child, so SwiftUI animates a single `frame` change instead of trying
     /// to keep two layers in sync.
     private func pillWidth(module: any NotchModule, moduleHot: Bool) -> CGFloat {
-        if isOpen { return NotchSizing.openSize.width }
+        if isOpen { return module.openExpandedWidth }
         if moduleHot { return vm.closedNotchSize.width + module.closedExtraWidth }
         return vm.closedNotchSize.width
     }
@@ -188,7 +212,10 @@ struct NotchView: View {
             closeTask = nil
             openHoverTask?.cancel()
             openHoverTask = Task {
-                try? await Task.sleep(for: Self.openHoverDebounce)
+                let delay = vm.anyModuleActive
+                    ? Self.openHoverDebounceActive
+                    : Self.openHoverDebounceIdle
+                try? await Task.sleep(for: delay)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     withAnimation(openSpring) {

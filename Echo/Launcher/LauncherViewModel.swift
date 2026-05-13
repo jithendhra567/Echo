@@ -34,7 +34,7 @@ final class LauncherViewModel {
     var filteredClips: [Clip] {
         guard let clipVM else { return [] }
         let query = searchQuery.lowercased()
-        guard !query.isEmpty else { return Array(clipVM.clips.prefix(10)) }
+        guard !query.isEmpty else { return Array(clipVM.clips.prefix(50)) }
         return clipVM.clips.filter { clipMatches($0, query: query) }
     }
 
@@ -164,6 +164,12 @@ final class LauncherViewModel {
             Task { await engine.recordUsage(bundleID: bid) }
         }
         onLaunch?()
+    }
+
+    /// Records a system-wide app activation so frequency rankings stay accurate
+    /// even when the user opens apps from the Dock, Finder, or other launchers.
+    func recordSystemActivation(bundleID: String) {
+        Task { await engine.recordUsage(bundleID: bundleID) }
     }
 
     func openTab(_ tab: BrowserTab) {

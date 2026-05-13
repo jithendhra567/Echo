@@ -6,6 +6,9 @@ import SwiftUI
 /// (Tray, Music) is active. **Reports `isActive == false`** so it does not
 /// surface itself in the closed pill: by default the closed state stays as
 /// the bare physical notch and the user reveals the clock by hovering.
+///
+/// Open layout: time + date on the left; optional camera mirror on the right
+/// after an explicit click (camera never starts until then).
 @Observable
 @MainActor
 final class ClockModule: NotchModule {
@@ -22,7 +25,12 @@ final class ClockModule: NotchModule {
     /// redundant tiny copy stuck above it.
     var showsClosedHeaderInOpen: Bool { false }
 
-    var openView: AnyView { AnyView(ClockOpenView()) }
+    /// Matches `NotchSizing.openSize.width` so the open pill uses the full canvas width.
+    var openExpandedWidth: CGFloat { NotchSizing.openSize.width }
+
+    let mirrorCapture = NotchMirrorCapture()
+
+    var openView: AnyView { AnyView(ClockOpenView(clock: self)) }
 }
 
 // MARK: - Formatters (cached — DateFormatter is expensive to construct)
@@ -35,42 +43,330 @@ private enum ClockFormat {
         f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
         return f
     }()
-
-    /// Month-name header for the calendar grid.
-    static let monthName: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = .current
-        f.setLocalizedDateFormatFromTemplate("LLLL")
-        return f
-    }()
-
-    static let year: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy"
-        return f
-    }()
 }
 
 // MARK: - Open view
 
+private enum ClockNotchLayout {
+    /// 1:1 mirror preview / gate tap target (points).
+    static let mirrorSquare: CGFloat = 176
+    /// Center column for the month grid (points).
+    static let calendarWidth: CGFloat = 152
+    static let dividerWidth: CGFloat = 1
+}
+
+private struct NotchClockDivider: View {
+    let maxHeight: CGFloat
+
+    var body: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.02),
+                        Color.white.opacity(0.2),
+                        Color.white.opacity(0.2),
+                        Color.white.opacity(0.02),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: ClockNotchLayout.dividerWidth)
+            .frame(maxHeight: maxHeight)
+    }
+}
+
+private enum WeekendTint: Equatable {
+    case saturday
+    case sunday
+
+    var color: Color {
+        switch self {
+        case .saturday: return Color(red: 0.48, green: 0.72, blue: 1.0)
+        case .sunday:   return Color(red: 1.0, green: 0.42, blue: 0.52)
+        }
+    }
+}
+
+/// Compact month grid for the center of the open clock notch.
+private struct NotchMiniCalendar: View {
+    let now: Date
+
+    private var calendar: Calendar { .current }
+
+    private static let monthTitle: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .current
+        f.setLocalizedDateFormatFromTemplate("yMMMM")
+        return f
+    }()
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(Self.monthTitle.string(from: now))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { i in
+                    let wd = weekdayForGridColumn(i)
+                    Text(weekdayHeader(i))
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(weekendTint(weekday: wd)?.color ?? .white.opacity(0.42))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(minimum: 12), spacing: 4), count: 7),
+                spacing: 4
+            ) {
+                ForEach(dayCells(), id: \.id) { cell in
+                    if let d = cell.day {
+                        Text("\(d)")
+                            .font(.system(size: 10, weight: cell.isToday ? .bold : .regular, design: .rounded))
+                            .foregroundStyle(dayNumberColor(cell))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 2)
+                            .background {
+                                if cell.isToday {
+                                    Circle()
+                                        .fill(Color(red: 0.35, green: 0.62, blue: 1.0).opacity(0.28))
+                                        .padding(1)
+                                }
+                            }
+                    } else {
+                        Color.clear
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 17)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 2)
+    }
+
+    /// Weekday component (1…7, Sunday=1) for the given grid column index.
+    private func weekdayForGridColumn(_ column: Int) -> Int {
+        ((calendar.firstWeekday - 1 + column) % 7) + 1
+    }
+
+    private func weekendTint(weekday: Int) -> WeekendTint? {
+        switch weekday {
+        case 1: return .sunday
+        case 7: return .saturday
+        default: return nil
+        }
+    }
+
+    private func dayNumberColor(_ cell: DayGridCell) -> Color {
+        if cell.isToday { return Color(red: 0.45, green: 0.78, blue: 1.0) }
+        if let w = cell.weekend { return w.color }
+        return .white.opacity(0.72)
+    }
+
+    private func weekdayHeader(_ column: Int) -> String {
+        let syms = calendar.veryShortWeekdaySymbols
+        let first = calendar.firstWeekday - 1
+        let idx = (column + first) % 7
+        return syms[idx]
+    }
+
+    private func dayCells() -> [DayGridCell] {
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
+              let dayRange = calendar.range(of: .day, in: .month, for: monthStart)
+        else { return [] }
+
+        let firstWeekday = calendar.component(.weekday, from: monthStart)
+        let lead = (firstWeekday - calendar.firstWeekday + 7) % 7
+        var out: [DayGridCell] = []
+        var id = 0
+        for _ in 0..<lead {
+            out.append(DayGridCell(id: id, day: nil, isToday: false, weekend: nil))
+            id += 1
+        }
+        for d in dayRange {
+            let date = calendar.date(byAdding: .day, value: d - 1, to: monthStart)!
+            let isToday = calendar.isDate(date, inSameDayAs: now)
+            let wd = calendar.component(.weekday, from: date)
+            let weekend = weekendTint(weekday: wd)
+            out.append(DayGridCell(id: id, day: d, isToday: isToday, weekend: weekend))
+            id += 1
+        }
+        while out.count < 42 {
+            out.append(DayGridCell(id: id, day: nil, isToday: false, weekend: nil))
+            id += 1
+        }
+        return out
+    }
+}
+
+private struct DayGridCell {
+    let id: Int
+    let day: Int?
+    let isToday: Bool
+    let weekend: WeekendTint?
+}
+
 private struct ClockOpenView: View {
+    @Bindable var clock: ClockModule
+    @State private var mirrorRevealed = false
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            HStack(alignment: .center, spacing: 22) {
-                ClockSummaryColumn(now: ctx.date)
+            GeometryReader { geo in
+                let innerW = geo.size.width
+                let innerH = geo.size.height
+                let divW = ClockNotchLayout.dividerWidth
+                let mirrorW = ClockNotchLayout.mirrorSquare
+                let gap = NotchSizing.openClockInterColumnSpacing
+                let gapsTotal = gap * 4
+                let calW = min(ClockNotchLayout.calendarWidth, max(128, innerW - mirrorW - divW * 2 - gapsTotal - 96))
+                let timeW = max(100, innerW - mirrorW - calW - divW * 2 - gapsTotal)
 
-                Rectangle()
-                    .fill(Color.white.opacity(0.10))
-                    .frame(width: 1)
-                    .padding(.vertical, 8)
+                HStack(alignment: .top, spacing: gap) {
+                    ClockSummaryColumn(now: ctx.date)
+                        .frame(width: timeW, height: innerH, alignment: .top)
 
-                MonthCalendarView(now: ctx.date)
+                    NotchClockDivider(maxHeight: innerH)
+
+                    NotchMiniCalendar(now: ctx.date)
+                        .frame(width: calW, height: innerH, alignment: .top)
+
+                    NotchClockDivider(maxHeight: innerH)
+
+                    ClockMirrorColumn(clock: clock, mirrorRevealed: $mirrorRevealed)
+                        .frame(width: mirrorW, height: innerH, alignment: .center)
+                }
+                .frame(width: innerW, height: innerH, alignment: .center)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.vertical, 10)
+            .padding(.bottom, 6)
         }
+        .onDisappear {
+            mirrorRevealed = false
+            clock.mirrorCapture.stop()
+        }
+    }
+}
+
+// MARK: - Mirror column (gated)
+
+private struct ClockMirrorColumn: View {
+    @Bindable var clock: ClockModule
+    @Binding var mirrorRevealed: Bool
+
+    private var capture: NotchMirrorCapture { clock.mirrorCapture }
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 0) {
+            if !mirrorRevealed {
+                Button {
+                    mirrorRevealed = true
+                    capture.startIfNeeded()
+                } label: {
+                    VStack(spacing: 12) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.52))
+                        Text("Click to show mirror")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                    }
+                    .frame(width: ClockNotchLayout.mirrorSquare, height: ClockNotchLayout.mirrorSquare)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.white.opacity(0.07))
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+            } else {
+                mirrorActiveBody
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private var mirrorActiveBody: some View {
+        switch capture.phase {
+        case .idle, .configuring:
+            ProgressView()
+                .controlSize(.regular)
+                .tint(.white)
+                .frame(width: ClockNotchLayout.mirrorSquare, height: ClockNotchLayout.mirrorSquare)
+                .frame(maxWidth: .infinity)
+        case .unauthorized:
+            mirrorNotice(
+                "Camera off",
+                "Allow camera access in System Settings → Privacy & Security → Camera."
+            )
+        case .noCamera:
+            mirrorNotice("No camera", "This Mac has no video input.")
+        case .running:
+            if let session = capture.session {
+                VStack(spacing: 12) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        NotchMirrorCameraPreview(session: session)
+                            .frame(width: ClockNotchLayout.mirrorSquare, height: ClockNotchLayout.mirrorSquare)
+                            .scaleEffect(x: -1, y: 1)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        Spacer(minLength: 0)
+                    }
+                    Button {
+                        mirrorRevealed = false
+                        capture.stop()
+                    } label: {
+                        Text("Hide mirror")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.78))
+                            .padding(.vertical, 7)
+                            .padding(.horizontal, 16)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.white.opacity(0.12))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                mirrorNotice("Camera", "Starting…")
+            }
+        case .failed(let msg):
+            mirrorNotice("Camera error", msg)
+        }
+    }
+
+    private func mirrorNotice(_ title: String, _ subtitle: String) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.55)
+                .lineLimit(5)
+        }
+        .padding(8)
+        .frame(width: ClockNotchLayout.mirrorSquare, height: ClockNotchLayout.mirrorSquare)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -99,6 +395,7 @@ private struct AnimatedClockTime: View {
         .monospacedDigit()
         .lineLimit(1)
         .minimumScaleFactor(0.7)
+        .frame(maxWidth: .infinity)
     }
 
     private var colon: some View {
@@ -140,112 +437,22 @@ private struct ClockSummaryColumn: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .center, spacing: 14) {
             Text(greeting)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.58))
+                .multilineTextAlignment(.center)
 
             AnimatedClockTime(now: now)
 
             Text(ClockFormat.fullDate.string(from: now))
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.75))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.78))
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(width: 180, alignment: .leading)
-    }
-}
-
-// MARK: - Month grid
-
-private struct MonthCalendarView: View {
-    let now: Date
-
-    private var calendar: Calendar { Calendar.current }
-
-    private var monthStart: Date {
-        let comps = calendar.dateComponents([.year, .month], from: now)
-        return calendar.date(from: comps) ?? now
-    }
-
-    private var daysInMonth: Int {
-        calendar.range(of: .day, in: .month, for: now)?.count ?? 30
-    }
-
-    /// Empty cells before day 1, honoring the locale's `firstWeekday`.
-    private var leadingBlanks: Int {
-        let firstWeekday = calendar.component(.weekday, from: monthStart)
-        return (firstWeekday - calendar.firstWeekday + 7) % 7
-    }
-
-    private var today: Int { calendar.component(.day, from: now) }
-
-    private var weekdaySymbols: [String] {
-        let base = calendar.veryShortStandaloneWeekdaySymbols      // Sun…Sat
-        let i = calendar.firstWeekday - 1
-        return Array(base[i...] + base[..<i])
-    }
-
-    private let columns = Array(
-        repeating: GridItem(.flexible(minimum: 14), spacing: 2),
-        count: 7
-    )
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Month + year header
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(ClockFormat.monthName.string(from: now))
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.95))
-                Text(ClockFormat.year.string(from: now))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.45))
-                Spacer(minLength: 0)
-            }
-            .padding(.bottom, 2)
-
-            // Weekday strip
-            LazyVGrid(columns: columns, spacing: 0) {
-                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, sym in
-                    Text(sym)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.35))
-                        .frame(height: 12)
-                }
-            }
-
-            // Day grid — 18pt cells with 2pt spacing comfortably fits 6 rows.
-            LazyVGrid(columns: columns, spacing: 2) {
-                ForEach(0..<leadingBlanks, id: \.self) { _ in
-                    Color.clear.frame(height: 18)
-                }
-                ForEach(1...daysInMonth, id: \.self) { day in
-                    dayCell(day: day, isToday: day == today)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func dayCell(day: Int, isToday: Bool) -> some View {
-        ZStack {
-            if isToday {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 18, height: 18)
-            }
-            Text("\(day)")
-                .font(.system(
-                    size: 11,
-                    weight: isToday ? .bold : .medium,
-                    design: .rounded
-                ))
-                .foregroundStyle(isToday ? Color.black : .white.opacity(0.85))
-                .monospacedDigit()
-        }
-        .frame(height: 18)
+        .frame(maxWidth: .infinity)
     }
 }

@@ -7,9 +7,23 @@ enum NotchSizing {
     /// Padding around the window to make room for shadow / overshoot.
     static let shadowPadding: CGFloat = 20
 
-    /// The exact frame the pill occupies when expanded. Height accommodates
-    /// a full 6-row month calendar with comfortable padding.
-    static let openSize = CGSize(width: 540, height: 200)
+    /// The exact frame the pill occupies when expanded (height fits clock +
+    /// mirror column, tab strip, and insets).
+    static let openSize = CGSize(width: 620, height: 272)
+
+    /// Padding from the top of the open pill to content (clears hardware notch / curve).
+    static let openContentTopInset: CGFloat = 22
+
+    /// Side inset for open module content (clock / tray / music).
+    static let openContentHorizontalInset: CGFloat = 28
+
+    /// Horizontal space between clock, calendar, and mirror in `ClockOpenView`.
+    static let openClockInterColumnSpacing: CGFloat = 14
+
+    /// Expanded pill height plus shadow band and clearance — `NotchLayoutGuide` / launcher use this.
+    static var expandedPillHeight: CGFloat {
+        openSize.height + shadowPadding + 16
+    }
 
     /// Total NSWindow size — wide enough to contain the maximum open pill plus
     /// shadow room. The window itself never resizes, only its SwiftUI content.

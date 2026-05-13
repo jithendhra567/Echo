@@ -6,26 +6,30 @@ import AppKit
 struct DashboardView: View {
     @Environment(LauncherSettings.self) private var settings
     @Environment(ClipViewModel.self) private var clipVM
+    @Environment(NotchLayoutGuide.self) private var notchLayout
 
     @State private var selection: SidebarItem? = .launcher
 
     var body: some View {
-        NavigationSplitView {
-            List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.title, systemImage: item.icon)
-                    .tag(item)
+        VStack(spacing: 0) {
+            Color.clear.frame(height: notchLayout.topInset)
+            NavigationSplitView {
+                List(SidebarItem.allCases, selection: $selection) { item in
+                    Label(item.title, systemImage: item.icon)
+                        .tag(item)
+                }
+                .listStyle(.sidebar)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            } detail: {
+                switch selection {
+                case .launcher, .none: LauncherSettingsPane()
+                case .clipboard:       ClipboardHistoryPane()
+                case .about:           AboutPane()
+                }
             }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-        } detail: {
-            switch selection {
-            case .launcher, .none: LauncherSettingsPane()
-            case .clipboard:       ClipboardHistoryPane()
-            case .about:           AboutPane()
-            }
+            .navigationTitle("")
+            .frame(minWidth: 720, minHeight: 480)
         }
-        .navigationTitle("")
-        .frame(minWidth: 720, minHeight: 480)
     }
 }
 

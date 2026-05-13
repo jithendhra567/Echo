@@ -63,7 +63,7 @@ final class BrowserTabEngine: Sendable {
             """
         case .arc:
             script = """
-            tell application "Arc"
+            tell application "Arc" 
                 repeat with w in windows
                     set tabList to tabs of w
                     set tIdx to 1

@@ -6,6 +6,9 @@ struct EchoApp: App {
 
     var body: some Scene {
         // Settings window — opened via right-click on the status bar icon
-        Settings { ContentView() }
+        Settings {
+            ContentView()
+                .environment(appDelegate.notchLayoutGuide)
+        }
     }
 }

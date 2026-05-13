@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Echo reads your open browser tabs so you can search and switch to them from the launcher.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Echo shows your camera in the notch mirror when you choose that tab.</string>
 <key>NSHumanReadableCopyright</key>
 	<string></string>
 </dict>
