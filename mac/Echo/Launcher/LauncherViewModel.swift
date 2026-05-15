@@ -13,6 +13,7 @@ final class LauncherViewModel {
     var isExpanded: Bool = false
     var isVisible: Bool = false
     var copiedClipID: UUID? = nil
+    var calculatorResultText: String? = nil
     var ignoreHover: Bool = true
 
     var onDismiss: (() -> Void)?
@@ -49,8 +50,14 @@ final class LauncherViewModel {
         !searchQuery.isEmpty && results.isEmpty && tabResults.isEmpty
     }
 
+    var showsCalculatorRow: Bool { calculatorResultText != nil }
+
+    var calculatorRowCount: Int { showsCalculatorRow ? 1 : 0 }
+
     var combinedCount: Int {
-        (showsGoogleFallback ? 1 : results.count) + tabResults.count
+        calculatorRowCount
+            + (showsGoogleFallback ? 1 : results.count)
+            + tabResults.count
     }
 
     init() {
@@ -65,6 +72,7 @@ final class LauncherViewModel {
     func search() {
         selectedIndex     = 0
         clipSelectedIndex = 0
+        calculatorResultText = MathExpressionEvaluator.evaluate(searchQuery)
         Task { results = await engine.search(query: searchQuery) }
         // Search the in-memory cache — no AppleScript on each keystroke.
         tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
@@ -131,13 +139,18 @@ final class LauncherViewModel {
     func confirmSelected() {
         switch activePanel {
         case .apps:
+            if showsCalculatorRow, selectedIndex == 0 {
+                copyCalculatorResult()
+                return
+            }
+            let contentIndex = selectedIndex - calculatorRowCount
             let appCount = showsGoogleFallback ? 1 : results.count
-            if selectedIndex < appCount {
+            if contentIndex < appCount {
                 if showsGoogleFallback { searchGoogle(); return }
-                guard results.indices.contains(selectedIndex) else { return }
-                launchApp(results[selectedIndex])
+                guard results.indices.contains(contentIndex) else { return }
+                launchApp(results[contentIndex])
             } else {
-                let tabIdx = selectedIndex - appCount
+                let tabIdx = contentIndex - appCount
                 guard tabResults.indices.contains(tabIdx) else { return }
                 openTab(tabResults[tabIdx])
             }
@@ -152,6 +165,15 @@ final class LauncherViewModel {
         guard let clipVM else { return }
         copiedClipID = clip.id
         clipVM.copy(clip)
+        Task {
+            try? await Task.sleep(for: .milliseconds(420))
+            dismiss()
+        }
+    }
+
+    func copyCalculatorResult() {
+        guard let text = calculatorResultText, let clipVM else { return }
+        clipVM.copyPlainTextSuppressingCapture(text)
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -208,8 +230,9 @@ final class LauncherViewModel {
         activePanel       = .apps
         isVisible         = false
         isExpanded        = false
-        copiedClipID      = nil
-        ignoreHover       = true
+        copiedClipID          = nil
+        calculatorResultText  = nil
+        ignoreHover           = true
         Task { await refreshDefaults() }
     }
 }

@@ -33,6 +33,14 @@ final class ClipViewModel {
         onDismiss?()
     }
 
+    /// Writes plain text to the pasteboard without recording a new clip.
+    func copyPlainTextSuppressingCapture(_ text: String) {
+        monitor.suppressNextCapture()
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+
     /// Writes to the pasteboard without triggering dismiss — use when the caller
     /// wants to show a confirmation animation before closing the panel.
     func copyToPasteboard(_ clip: Clip) {

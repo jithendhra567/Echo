@@ -159,39 +159,66 @@ struct DynamicIslandView: View {
     // MARK: - Apps column (left)
 
     private var appColumn: some View {
-        VStack(spacing: 0) {
+        let calcOffset = vm.calculatorRowCount
+        return VStack(spacing: 0) {
             sectionLabel("APPS", active: vm.activePanel == .apps)
 
-            if vm.results.isEmpty && vm.tabResults.isEmpty {
+            if vm.results.isEmpty && vm.tabResults.isEmpty && !vm.showsCalculatorRow {
                 if vm.showsGoogleFallback {
                     GoogleSearchRow(
                         query: vm.searchQuery,
-                        isSelected: vm.activePanel == .apps && vm.selectedIndex == 0
+                        isSelected: vm.activePanel == .apps && vm.selectedIndex == calcOffset
                     )
                     .padding(.horizontal, 6)
                     .padding(.top, 4)
                     .onTapGesture { vm.searchGoogle() }
-                    .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = 0 } }
+                    .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = calcOffset } }
                 } else {
                     emptyLabel("No results")
                 }
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 1) {
+                        if vm.showsCalculatorRow, let result = vm.calculatorResultText {
+                            CalculatorResultRow(
+                                query: vm.searchQuery,
+                                result: result,
+                                isSelected: vm.activePanel == .apps && vm.selectedIndex == 0
+                            )
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : -6)
+                            .animation(
+                                .spring(response: 0.28, dampingFraction: 0.80),
+                                value: showContent
+                            )
+                            .onTapGesture { vm.selectedIndex = 0; vm.copyCalculatorResult() }
+                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = 0 } }
+                        }
+
+                        if vm.results.isEmpty && vm.tabResults.isEmpty && vm.showsGoogleFallback {
+                            GoogleSearchRow(
+                                query: vm.searchQuery,
+                                isSelected: vm.activePanel == .apps && vm.selectedIndex == calcOffset
+                            )
+                            .onTapGesture { vm.searchGoogle() }
+                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = calcOffset } }
+                        }
+
                         ForEach(Array(vm.results.enumerated()), id: \.element.id) { idx, app in
+                            let globalIdx = calcOffset + idx
                             AppResultRow(
                                 app: app,
-                                isSelected: vm.activePanel == .apps && idx == vm.selectedIndex
+                                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
                             )
                             .opacity(showContent ? 1 : 0)
                             .offset(y: showContent ? 0 : -6)
                             .animation(
                                 .spring(response: 0.28, dampingFraction: 0.80)
-                                    .delay(Double(idx) * 0.016),
+                                    .delay(Double(globalIdx) * 0.016),
                                 value: showContent
                             )
-                            .onTapGesture { vm.selectedIndex = idx; vm.launchApp(app) }
-                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = idx } }
+                            .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
+                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
                         }
 
                         if !vm.tabResults.isEmpty {
@@ -200,7 +227,7 @@ struct DynamicIslandView: View {
 
                             let appCount = vm.showsGoogleFallback ? 1 : vm.results.count
                             ForEach(Array(vm.tabResults.enumerated()), id: \.element.id) { idx, tab in
-                                let globalIdx = appCount + idx
+                                let globalIdx = calcOffset + appCount + idx
                                 BrowserTabResultRow(
                                     tab: tab,
                                     isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
@@ -419,6 +446,57 @@ private struct BrowserTabResultRow: View {
         .foregroundColor(isSelected ? .white : .white.opacity(0.82))
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.white.opacity(0.10) : Color.clear)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected)
+    }
+}
+
+// MARK: - Calculator result row
+
+private struct CalculatorResultRow: View {
+    let query: String
+    let result: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color(red: 0.35, green: 0.72, blue: 0.45).opacity(0.85))
+                    .frame(width: 26, height: 26)
+                Image(systemName: "equal")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(query)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.40))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(result)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            if isSelected {
+                Image(systemName: "return")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.40))
+                    .transition(.opacity.combined(with: .scale(scale: 0.7)))
+            }
+        }
+        .foregroundColor(isSelected ? .white : .white.opacity(0.82))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isSelected ? Color.white.opacity(0.10) : Color.clear)

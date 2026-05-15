@@ -34,6 +34,7 @@ final class TrayModule: NotchModule {
     var isActive: Bool { isDragInFlight || !files.isEmpty }
 
     var files:             [TrayFile] = []
+    var selectedIDs:       Set<UUID>  = []
     var isDragInFlight:    Bool       = false
     var isDropHighlighted: Bool       = false
 
@@ -199,8 +200,15 @@ final class TrayModule: NotchModule {
                     return nil
                 }()
                 guard let fileURL, fileURL.isFileURL else { return }
+                let resolvedPath = fileURL.resolvingSymlinksInPath().path
                 DispatchQueue.main.async {
                     guard let self else { return }
+                    // Prevent self-drop: skip files already tracked by path.
+                    // URL equality alone can fail due to percent-encoding differences
+                    // when NSItemProvider round-trips the URL.
+                    guard !self.files.contains(where: {
+                        $0.url.resolvingSymlinksInPath().path == resolvedPath
+                    }) else { return }
                     do {
                         let shelfURL = try self.resolvedShelfURL(from: fileURL)
                         self.addFiles([shelfURL])
@@ -240,6 +248,14 @@ final class TrayModule: NotchModule {
 
     // MARK: - File operations
 
+    func toggleSelection(id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
     func addFiles(_ urls: [URL]) {
         let fresh = urls
             .filter { u in !files.contains(where: { $0.url == u }) }
@@ -255,6 +271,16 @@ final class TrayModule: NotchModule {
             try? FileManager.default.removeItem(at: file.url)
         }
         files.removeAll { $0.id == id }
+        if selectedIDs.contains(id) { selectedIDs.remove(id) }
+        onContentChanged?()
+    }
+
+    func clearAll() {
+        for file in files where isUnderShelf(file.url) {
+            try? FileManager.default.removeItem(at: file.url)
+        }
+        files.removeAll()
+        selectedIDs.removeAll()
         onContentChanged?()
     }
 
@@ -359,17 +385,31 @@ private struct TrayOpenView: View {
     }
 
     private var dropImportControls: some View {
-        Picker("Copy or move", selection: $module.dropImportMode) {
-            ForEach(TrayDropImportMode.allCases) { mode in
-                Text(mode.title).tag(mode)
+        HStack(spacing: 8) {
+            Picker("Copy or move", selection: $module.dropImportMode) {
+                ForEach(TrayDropImportMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .labelsHidden()
+            .accessibilityLabel("Copy or move dropped files")
+
+            if !module.files.isEmpty {
+                Button("Clear All") {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        module.clearAll()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.55))
+                .transition(.opacity.combined(with: .scale))
             }
         }
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .labelsHidden()
-        .accessibilityLabel("Copy or move dropped files")
         .padding(.horizontal, 2)
-        .padding(.bottom, 4)
+        .padding(.bottom, 10)
     }
 
     private var emptyState: some View {
@@ -391,7 +431,34 @@ private struct TrayOpenView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(module.files) { file in
-                    TrayFileCard(file: file) { module.remove(id: file.id) }
+                    TrayFileCard(
+                        file: file,
+                        isSelected: module.selectedIDs.contains(file.id),
+                        onToggleSelect: { module.toggleSelection(id: file.id) },
+                        onRemove: {
+                            module.selectedIDs.remove(file.id)
+                            module.remove(id: file.id)
+                        },
+                        dragURLs: {
+                            // Drag all selected files if this card is selected,
+                            // otherwise drag just this one (Finder-style behaviour).
+                            let ids = module.selectedIDs.contains(file.id)
+                                ? module.selectedIDs
+                                : [file.id]
+                            return module.files
+                                .filter { ids.contains($0.id) }
+                                .map { $0.url }
+                        }(),
+                        onDragEndedWithMove: {
+                            // Remove whichever files were part of this drag.
+                            let ids = module.selectedIDs.contains(file.id)
+                                ? module.selectedIDs
+                                : Set([file.id])
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                for id in ids { module.remove(id: id) }
+                            }
+                        }
+                    )
                 }
                 TrayMorePlaceholder(highlighted: module.isDropHighlighted)
             }
@@ -401,8 +468,46 @@ private struct TrayOpenView: View {
     }
 }
 
-private struct TrayFileCard: View {
+// MARK: - File card
+
+/// NSViewRepresentable wrapper — hands drag entirely to CardHostView so we can call
+/// beginDraggingSession(with:event:source:) and pass multiple NSDraggingItems.
+/// SwiftUI's .onDrag only supports a single NSItemProvider, so it cannot do multi-file drags.
+private struct TrayFileCard: NSViewRepresentable {
     let file: TrayFile
+    let isSelected: Bool
+    let onToggleSelect: () -> Void
+    let onRemove: () -> Void
+    let dragURLs: [URL]
+    let onDragEndedWithMove: (() -> Void)?
+
+    func makeNSView(context: Context) -> CardHostView {
+        let host = CardHostView(rootView: makeContent(), dragURLs: dragURLs)
+        host.onDragEndedWithMove = onDragEndedWithMove
+        return host
+    }
+
+    func updateNSView(_ nsView: CardHostView, context: Context) {
+        nsView.dragURLs = dragURLs
+        nsView.onDragEndedWithMove = onDragEndedWithMove
+        nsView.updateContent(makeContent())   // also syncs recognizer
+    }
+
+    private func makeContent() -> TrayFileCardContent {
+        TrayFileCardContent(
+            file: file,
+            isSelected: isSelected,
+            onToggleSelect: onToggleSelect,
+            onRemove: onRemove
+        )
+    }
+}
+
+/// Pure SwiftUI visuals — selection ring, checkmark badge, filename, xmark button.
+private struct TrayFileCardContent: View {
+    let file: TrayFile
+    let isSelected: Bool
+    let onToggleSelect: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -414,7 +519,23 @@ private struct TrayFileCard: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 44, height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .shadow(color: .black.opacity(0.5), radius: 3, y: 2)
+                    .shadow(color: .black.opacity(isSelected ? 0 : 0.5), radius: 3, y: 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(Color.accentColor, lineWidth: isSelected ? 2.5 : 0)
+                    )
+                    .overlay(alignment: .topLeading) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(Color.white, Color.accentColor)
+                                .offset(x: -7, y: -7)
+                                .transition(.scale(scale: 0.4).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isSelected)
+
                 Text(file.name)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
@@ -424,6 +545,8 @@ private struct TrayFileCard: View {
             }
             .padding(.top, 1)
             .frame(width: 72)
+            .contentShape(Rectangle())
+            .onTapGesture { onToggleSelect() }
 
             Button {
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
@@ -438,9 +561,118 @@ private struct TrayFileCard: View {
             .buttonStyle(.plain)
             .offset(x: 4, y: -2)
         }
-        .onDrag {
-            NSItemProvider(object: file.url as NSURL)
+    }
+}
+
+/// NSView container for a file card.
+///
+/// SwiftUI events (taps, button presses) are routed normally to the inner hostingView.
+/// Drag detection is handled by CardDragRecognizer — an NSGestureRecognizer attached
+/// to the hostingView — which fires once the drag threshold is crossed and calls
+/// beginDraggingSession with one NSDraggingItem per selected URL.
+///
+/// Directly calling hostingView.mouseDown / overriding hitTest both crash: NSHostingView
+/// is not safe to receive synthesised mouse events outside the normal responder chain.
+private final class CardHostView: NSView, NSDraggingSource {
+    private let hostingView: NSHostingView<TrayFileCardContent>
+    private let dragRecognizer = CardDragRecognizer()
+    var dragURLs: [URL]
+    var onDragEndedWithMove: (() -> Void)?
+
+    init(rootView: TrayFileCardContent, dragURLs: [URL]) {
+        self.dragURLs    = dragURLs
+        self.hostingView = NSHostingView(rootView: rootView)
+        super.init(frame: .zero)
+
+        dragRecognizer.dragAction = { [weak self] event in self?.startDrag(from: event) }
+        hostingView.addGestureRecognizer(dragRecognizer)
+
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func updateContent(_ rootView: TrayFileCardContent) {
+        hostingView.rootView = rootView
+        dragRecognizer.dragURLs = dragURLs   // keep recognizer in sync
+    }
+
+    private func startDrag(from event: NSEvent) {
+        guard !dragURLs.isEmpty else { return }
+        let items = dragURLs.enumerated().map { i, url -> NSDraggingItem in
+            let item  = NSDraggingItem(pasteboardWriter: url as NSURL)
+            let icon  = NSWorkspace.shared.icon(forFile: url.path)
+            let size  = CGSize(width: 44, height: 44)
+            let drift = CGFloat(i) * 3       // slight stagger → macOS "stack" look
+            icon.size = size
+            item.setDraggingFrame(
+                NSRect(x: -(size.width / 2) + drift, y: -(size.height / 2) - drift,
+                       width: size.width, height: size.height),
+                contents: icon
+            )
+            return item
         }
+        beginDraggingSession(with: items, event: event, source: self)
+    }
+
+    nonisolated func draggingSession(
+        _ session: NSDraggingSession,
+        sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation { [.copy, .move, .link] }
+
+    nonisolated func draggingSession(
+        _ session: NSDraggingSession,
+        endedAt screenPoint: NSPoint,
+        operation: NSDragOperation
+    ) {
+        guard operation == .move else { return }
+        Task { @MainActor [weak self] in
+            self?.onDragEndedWithMove?()
+        }
+    }
+}
+
+/// Detects a mouse drag on the hosting view without interfering with SwiftUI's own
+/// gesture recognizers (tap-to-select, button presses). delaysPrimaryMouseButtonEvents
+/// is false so clicks are never held up waiting for this recognizer to decide.
+private final class CardDragRecognizer: NSGestureRecognizer {
+    var dragAction: ((NSEvent) -> Void)?
+    var dragURLs: [URL] = []
+    private var startEvent: NSEvent?
+    private let threshold: CGFloat = 4
+
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        delaysPrimaryMouseButtonEvents = false
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseDown(with event: NSEvent) {
+        startEvent = event
+        state = .possible
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let start = startEvent else { return }
+        let dx = event.locationInWindow.x - start.locationInWindow.x
+        let dy = event.locationInWindow.y - start.locationInWindow.y
+        guard sqrt(dx * dx + dy * dy) >= threshold else { return }
+        startEvent = nil
+        dragAction?(start)
+        state = .ended
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        startEvent = nil
+        if state == .possible { state = .failed }
     }
 }
 
