@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(NotchLayoutGuide.self) private var notchLayout
+    @Environment(LaunchAtLoginController.self) private var launchAtLogin
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,14 +19,34 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .font(.callout)
+
+                Toggle("Open Echo at login", isOn: openAtLoginBinding)
+                    .toggleStyle(.switch)
+                    .padding(.top, 4)
+
+                if let err = launchAtLogin.lastErrorMessage {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
             }
-            .frame(width: 320, height: 200)
+            .frame(width: 320)
             .padding(28)
         }
+        .onAppear { launchAtLogin.refreshStatus() }
+    }
+
+    private var openAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLogin.isOpenAtLoginEnabled },
+            set: { launchAtLogin.setOpenAtLogin($0) }
+        )
     }
 }
 
 #Preview {
     ContentView()
         .environment(NotchLayoutGuide())
+        .environment(LaunchAtLoginController())
 }

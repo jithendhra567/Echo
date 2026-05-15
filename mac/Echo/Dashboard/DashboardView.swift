@@ -58,11 +58,30 @@ private enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
 
 struct LauncherSettingsPane: View {
     @Environment(LauncherSettings.self) private var settings
+    @Environment(LaunchAtLoginController.self) private var launchAtLogin
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 header(icon: "magnifyingglass.circle.fill", title: "Launcher", subtitle: "App launcher with fuzzy search")
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Open Echo at login", isOn: openAtLoginBinding)
+                            .font(.headline)
+
+                        Text("Echo starts automatically after you log in or restart your Mac. You can also change this in System Settings → General → Login Items & Extensions.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+
+                        if let err = launchAtLogin.lastErrorMessage {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .padding(8)
+                }
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 16) {
@@ -123,6 +142,14 @@ struct LauncherSettingsPane: View {
             .padding(28)
         }
         .navigationTitle("Launcher")
+        .onAppear { launchAtLogin.refreshStatus() }
+    }
+
+    private var openAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLogin.isOpenAtLoginEnabled },
+            set: { launchAtLogin.setOpenAtLogin($0) }
+        )
     }
 }
 

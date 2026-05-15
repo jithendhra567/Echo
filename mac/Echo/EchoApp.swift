@@ -9,6 +9,7 @@ struct EchoApp: App {
         Settings {
             ContentView()
                 .environment(appDelegate.notchLayoutGuide)
+                .environment(appDelegate.launchAtLogin)
         }
     }
 }

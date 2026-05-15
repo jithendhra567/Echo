@@ -25,8 +25,10 @@ xcodebuild -project Echo.xcodeproj -scheme Echo -configuration Debug
 Echo/
 ├── EchoApp.swift              # @main; NSApplicationDelegateAdaptor → AppDelegate; Settings scene
 ├── AppDelegate.swift          # Wires all subsystems; status bar; two HotkeyManagers; app-launch tracking
+│                              #   left-click → launcher, right-click → menu (Dashboard / Quit)
 ├── ClipViewModel.swift        # @Observable; bridges ClipboardMonitor ↔ ClipStore ↔ UI
 ├── ContentView.swift          # Accessibility permission onboarding UI
+├── LaunchAtLoginController.swift  # @Observable; SMAppService.mainApp (macOS 13+); toggle login-item
 │
 ├── Models/Clip.swift          # Clip struct (Sendable); ClipContentType enum
 ├── Clipboard/                 # ClipboardMonitor (500ms poll) + AppMetadataCapture (AX API)
@@ -50,12 +52,15 @@ Echo/
 │
 ├── Notch/                     # Menu-bar notch pill (always visible, level .mainMenu+3)
 │   ├── NotchPanel.swift       # NSPanel; ignoresMouseEvents toggle; drag detection
-│   ├── NotchViewModel.swift   # State (closed/open); module priority (Tray > Clock)
+│   ├── NotchViewModel.swift   # State (closed/open); module priority (Tray > Music > Clock)
 │   ├── NotchView.swift        # SwiftUI pill UI
+│   ├── NotchShape.swift       # Notch-shaped Shape; animatableData interpolates corners (liquid expand)
 │   ├── NotchLayoutGuide.swift # @Observable topInset; posts .echoNotchTopInsetDidChange
 │   ├── NotchSizing.swift      # Notch geometry; screen detection; fullscreen suppression
 │   ├── GlobalDragMonitor.swift# System-wide drag tracking for tray drop zone
-│   ├── Modules/               # NotchModule protocol; TrayModule; ClockModule
+│   ├── NotchMirrorCapture.swift  # AVCaptureSession for camera mirror (requires Camera permission)
+│   ├── TrayFile.swift         # File metadata struct for the Tray drop-zone (preview + icon)
+│   ├── Modules/               # NotchModule protocol; TrayModule; MusicModule; ClockModule
 │   └── MediaRemote/           # Now-playing info via MediaRemote private framework
 │
 ├── Dashboard/DashboardView.swift  # NavigationSplitView: Launcher settings, Clipboard history, About
@@ -114,6 +119,8 @@ The app requests Accessibility access on first launch. Without it:
 - `NSEvent.addGlobalMonitorForEvents` receives no events
 
 The global hotkeys and Escape-to-close both rely on this permission.
+
+**Camera** is requested lazily when `NotchMirrorCapture.startIfNeeded()` is called (from `ClockModule`). The capture session runs on a dedicated `DispatchQueue` (`com.echo.notch.mirror.session`); the `AVCaptureVideoPreviewLayer` is hosted in `NotchMirrorCameraPreview` (`NSViewRepresentable`).
 
 ### Adding new content types
 

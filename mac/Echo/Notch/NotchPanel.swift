@@ -162,19 +162,40 @@ final class NotchPanel: NSPanel {
         // Small inset buffer so cursor touching the edge still registers.
         let pillRect   = currentPillRect().insetBy(dx: -4, dy: -4)
         let overPill   = pillRect.contains(windowPt)
-        let dragActive = viewModel.tray.isDragInFlight
 
-        // Accept events only when cursor is directly over the pill, an external drag
-        // is in flight, or the user is dragging a file OUT of the tray. currentPillRect()
-        // already returns open-pill bounds when notchState == .open, so the open-state
-        // margin outside the pill stays transparent — clicks reach Chrome tabs / Xcode
-        // windows behind us.
-        let shouldAccept = overPill || dragActive || isDragOutInFlight
+        // Only accept events during a drag when the cursor is actually near the pill.
+        // Accepting events for the entire window whenever any drag is in flight causes
+        // SwiftUI hover to fire from far away and opens the pill unexpectedly.
+        var dragNearPill = false
+        if viewModel.tray.isDragInFlight, let content = contentView {
+            let local = content.convert(windowPt, from: nil)
+            dragNearPill = dragProximityRect(in: content).contains(local)
+        }
+
+        // Accept events only when cursor is directly over the pill, near the pill during
+        // a drag, or the user is dragging a file OUT of the tray.
+        let shouldAccept = overPill || dragNearPill || isDragOutInFlight
         let newIgnore    = !shouldAccept
 
         if ignoresMouseEvents != newIgnore {
             ignoresMouseEvents = newIgnore
         }
+    }
+
+    /// Proximity zone around the closed pill used for drag attraction.
+    /// Based on the closed pill size (not the open size) so the trigger area
+    /// stays tight to the actual pill location rather than covering most of the
+    /// top portion of the screen.
+    private func dragProximityRect(in content: NSView) -> NSRect {
+        let h = viewModel.closedNotchSize.height
+        let w = viewModel.closedNotchSize.width
+        let closedPill = NSRect(
+            x: content.bounds.midX - w / 2,
+            y: content.bounds.maxY - h,
+            width: w,
+            height: h
+        )
+        return closedPill.insetBy(dx: -80, dy: -60)
     }
 
     // MARK: - Screen layout
@@ -281,14 +302,6 @@ final class NotchPanel: NSPanel {
         ignoresMouseEvents          = true  // default: fully transparent until cursor enters pill
     }
 
-    // MARK: - Pill rect for drag-halo detection
-
-    private func openPillRect(in bounds: NSRect) -> NSRect {
-        let w = NotchSizing.openSize.width
-        let h = NotchSizing.openSize.height
-        return NSRect(x: bounds.midX - w / 2, y: bounds.maxY - h, width: w, height: h)
-    }
-
     // MARK: - Drag monitor
 
     private var lastDragTick: TimeInterval = 0
@@ -306,8 +319,7 @@ final class NotchPanel: NSPanel {
             guard let content = self.contentView else { return }
             let windowPt = self.convertPoint(fromScreen: screenPt)
             let local    = content.convert(windowPt, from: nil)
-            let halo     = self.openPillRect(in: content.bounds).insetBy(dx: -60, dy: -50)
-            if halo.contains(local) {
+            if self.dragProximityRect(in: content).contains(local) {
                 self.viewModel.open()
             }
         }

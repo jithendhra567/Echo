@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let notchLayoutGuide = NotchLayoutGuide()
+    let launchAtLogin = LaunchAtLoginController()
 
     private var store: ClipStore!
     private var monitor: ClipboardMonitor!
@@ -17,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dashboardWindow: NSWindow?
     private var globalMonitor: Any?
     private var notchPanel: NotchPanel!
+    private var activationObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         store            = ClipStore()
@@ -68,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         setupGlobalHotkey()
         setupAppActivationTracking()
+        setupLaunchAtLoginStatusRefresh()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -113,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let content = DashboardView()
             .environment(launcherSettings)
+            .environment(launchAtLogin)
             .environment(viewModel)
             .environment(notchLayoutGuide)
 
@@ -171,5 +175,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.unregister()
         clipHotkeyManager.unregister()
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
+        if let o = activationObserver {
+            NotificationCenter.default.removeObserver(o)
+            activationObserver = nil
+        }
+    }
+
+    /// Keeps the “Open at login” toggle in sync if the user changes Login Items in System Settings.
+    private func setupLaunchAtLoginStatusRefresh() {
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.launchAtLogin.refreshStatus()
+        }
     }
 }
