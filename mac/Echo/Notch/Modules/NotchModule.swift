@@ -27,6 +27,11 @@ protocol NotchModule: AnyObject {
     /// hit-testing and `ignoresMouseEvents` math).
     var openExpandedWidth: CGFloat { get }
 
+    /// Height of the pill when `notchState == .open`. Modules with compact
+    /// content (tray) can return a smaller value so the pill doesn't waste
+    /// vertical space; richer modules (clock/calendar) keep the full height.
+    var openExpandedHeight: CGFloat { get }
+
     /// SwiftUI fragments rendered by `NotchView` inside the pill chrome.
     var closedLeft:   AnyView { get }
     var closedRight:  AnyView { get }
@@ -46,4 +51,5 @@ extension NotchModule {
     var closedExtraWidth:        CGFloat { 90 }
     var showsClosedHeaderInOpen: Bool    { true }
     var openExpandedWidth:       CGFloat { NotchSizing.openSize.width }
+    var openExpandedHeight:      CGFloat { NotchSizing.openSize.height }
 }

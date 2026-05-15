@@ -73,7 +73,9 @@ struct NotchView: View {
     }
 
     private func syncEchoChromeTopInset() {
-        notchLayout.setTopInset(vm.notchState == .open ? NotchSizing.expandedPillHeight : 0)
+        guard vm.notchState == .open else { notchLayout.setTopInset(0); return }
+        let h = vm.activeModule.openExpandedHeight + NotchSizing.openShadowBottomPadding + 16
+        notchLayout.setTopInset(h)
     }
 
     // MARK: - The pill
@@ -167,7 +169,7 @@ struct NotchView: View {
     }
 
     private func pillHeight() -> CGFloat {
-        isOpen ? NotchSizing.openSize.height : vm.closedNotchSize.height
+        isOpen ? vm.activeModule.openExpandedHeight : vm.closedNotchSize.height
     }
 
     // MARK: - Hover

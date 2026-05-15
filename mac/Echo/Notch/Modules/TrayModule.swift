@@ -28,6 +28,8 @@ final class TrayModule: NotchModule {
     let iconName     = "tray.and.arrow.down.fill"
     /// Open tray already lists files — hide the duplicate closed strip to save vertical space.
     var showsClosedHeaderInOpen: Bool { false }
+    /// Tray content is compact (controls + one row of cards), no need for the full 248pt pill.
+    var openExpandedHeight: CGFloat { 170 }
 
     let supportsDrop = true
 
@@ -381,6 +383,7 @@ private struct TrayOpenView: View {
                 fileRow
             }
         }
+        .padding(.top, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

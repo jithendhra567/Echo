@@ -139,7 +139,7 @@ final class NotchPanel: NSPanel {
 
         if viewModel.notchState == .open {
             pillW = viewModel.activeModule.openExpandedWidth
-            pillH = NotchSizing.openSize.height
+            pillH = viewModel.activeModule.openExpandedHeight
         } else {
             let mod   = viewModel.activeModule
             let extra = mod.isActive ? mod.closedExtraWidth : 0
@@ -223,7 +223,12 @@ final class NotchPanel: NSPanel {
         orderFrontRegardless()
         contentView?.needsLayout = true
         contentView?.layoutSubtreeIfNeeded()
-        layoutGuide.setTopInset(viewModel.notchState == .open ? NotchSizing.expandedPillHeight : 0)
+        if viewModel.notchState == .open {
+            let h = viewModel.activeModule.openExpandedHeight + NotchSizing.openShadowBottomPadding + 16
+            layoutGuide.setTopInset(h)
+        } else {
+            layoutGuide.setTopInset(0)
+        }
         // Let cursor tracking decide ignoresMouseEvents — do NOT force it here.
         updateMousePassthrough()
     }
@@ -363,7 +368,7 @@ private final class PillHostingView<C: View>: NSHostingView<C> {
 
         if vm.notchState == .open {
             pillW = vm.activeModule.openExpandedWidth
-            pillH = NotchSizing.openSize.height
+            pillH = vm.activeModule.openExpandedHeight
         } else {
             let mod   = vm.activeModule
             let extra = mod.isActive ? mod.closedExtraWidth : 0
