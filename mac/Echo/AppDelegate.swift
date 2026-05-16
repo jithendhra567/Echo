@@ -21,6 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var activationObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Must be set programmatically rather than via LSUIElement = true in Info.plist.
+        // LSUIElement stamps kLSServerConnectionStatusProcessIsDaemonMask on the process,
+        // which the WebContent XPC service inherits, crashing it on launch.
+        NSApp.setActivationPolicy(.accessory)
+
         store            = ClipStore()
         monitor          = ClipboardMonitor(store: store)
         viewModel        = ClipViewModel(store: store, monitor: monitor)
@@ -80,7 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let btn = statusItem.button!
-        btn.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Echo")
+        btn.image = EchoIconImage.menuBarImage()
+        btn.image?.accessibilityDescription = "Echo"
         btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
         btn.action = #selector(statusBarClicked)
         btn.target = self

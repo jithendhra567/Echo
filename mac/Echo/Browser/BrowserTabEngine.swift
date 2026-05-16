@@ -97,30 +97,43 @@ final class BrowserTabEngine: Sendable {
         let script: String
         switch browser {
         case .safari:
+            // Safari has no public AppleScript API to detect private windows.
+            // Wrapping each window in `try` causes Safari to silently skip
+            // windows it refuses to expose (e.g. restricted private windows on
+            // newer macOS). We also filter out internal `about:` URLs below.
             script = """
             set out to ""
             tell application "Safari"
                 repeat with w in windows
-                    repeat with t in tabs of w
-                        set out to out & (name of t) & "\n" & (URL of t) & "\n"
-                    end repeat
+                    try
+                        repeat with t in tabs of w
+                            set tURL to URL of t
+                            if tURL is not missing value then
+                                set out to out & (name of t) & "\n" & tURL & "\n"
+                            end if
+                        end repeat
+                    end try
                 end repeat
             end tell
             return out
             """
         case .chrome:
+            // Skip incognito windows using Chrome's AppleScript `mode` property.
             script = """
             set out to ""
             tell application "Google Chrome"
                 repeat with w in windows
-                    repeat with t in tabs of w
-                        set out to out & (title of t) & "\n" & (URL of t) & "\n"
-                    end repeat
+                    if mode of w is "normal" then
+                        repeat with t in tabs of w
+                            set out to out & (title of t) & "\n" & (URL of t) & "\n"
+                        end repeat
+                    end if
                 end repeat
             end tell
             return out
             """
         case .arc:
+            // Arc has no traditional incognito mode; include all tabs.
             script = """
             set out to ""
             tell application "Arc"
@@ -155,12 +168,30 @@ final class BrowserTabEngine: Sendable {
                 while i + 1 < lines.count {
                     let title = lines[i]
                     let url   = lines[i + 1]
-                    tabs.append(BrowserTab(id: UUID(), title: title, url: url, browser: browser))
+                    // Drop internal browser pages (new-tab, error pages, etc.)
+                    // that have no meaningful content to record.
+                    if !Self.isInternalURL(url) {
+                        tabs.append(BrowserTab(id: UUID(), title: title, url: url, browser: browser))
+                    }
                     i += 2
                 }
                 continuation.resume(returning: tabs)
             }
         }
+    }
+
+    /// Returns true for browser-internal URLs that should never be recorded
+    /// (new-tab pages, error pages, extension pages, devtools, etc.).
+    private nonisolated static func isInternalURL(_ url: String) -> Bool {
+        let internalPrefixes = [
+            "about:",
+            "chrome://",
+            "chrome-extension://",
+            "chrome-devtools://",
+            "edge://",
+        ]
+        let lower = url.lowercased()
+        return internalPrefixes.contains(where: { lower.hasPrefix($0) })
     }
 
     private func bundleID(for browser: BrowserTab.Browser) -> String {

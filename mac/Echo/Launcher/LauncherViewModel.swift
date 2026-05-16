@@ -13,11 +13,21 @@ final class LauncherViewModel {
     var isExpanded: Bool = false
     var isVisible: Bool = false
     var copiedClipID: UUID? = nil
-    var calculatorResultText: String? = nil
+    var utilityResult: UtilityResult? = nil
+    var utilityIsLoading: Bool = false
+    var utilityError: String? = nil
     var ignoreHover: Bool = true
+    var isInstantSearchOpen: Bool = false
+    /// When both Instant Search and Google rows show, usage picks which appears first.
+    var instantSearchFirst: Bool = true
+
+    let instantSearchSession = InstantSearchSession()
+
+    private var utilityResolveTask: Task<Void, Never>?
 
     var onDismiss: (() -> Void)?
     var onLaunch:  (() -> Void)?
+    var onInstantSearchChanged: ((Bool) -> Void)?
 
     var clipVM: ClipViewModel?
 
@@ -50,13 +60,34 @@ final class LauncherViewModel {
         !searchQuery.isEmpty && results.isEmpty && tabResults.isEmpty
     }
 
-    var showsCalculatorRow: Bool { calculatorResultText != nil }
+    var showsInstantSearchRow: Bool { showsGoogleFallback }
 
-    var calculatorRowCount: Int { showsCalculatorRow ? 1 : 0 }
+    var instantSearchRowCount: Int { showsInstantSearchRow ? 1 : 0 }
+
+    var googleFallbackRowCount: Int { showsGoogleFallback ? 1 : 0 }
+
+    var webFallbackRowCount: Int {
+        guard showsGoogleFallback else { return 0 }
+        return instantSearchRowCount + googleFallbackRowCount
+    }
+
+    var instantSearchHostLabel: String {
+        InstantSearchURLResolver.displayHost(for: searchQuery, isDomainQuery: isDomainQuery)
+    }
+
+    var instantSearchTargetURL: URL? {
+        InstantSearchURLResolver.targetURL(for: searchQuery, isDomainQuery: isDomainQuery)
+    }
+
+    var showsUtilityRow: Bool {
+        utilityResult != nil || utilityIsLoading || utilityError != nil
+    }
+
+    var utilityRowCount: Int { showsUtilityRow ? 1 : 0 }
 
     var combinedCount: Int {
-        calculatorRowCount
-            + (showsGoogleFallback ? 1 : results.count)
+        utilityRowCount
+            + (showsGoogleFallback ? webFallbackRowCount : results.count)
             + tabResults.count
     }
 
@@ -72,10 +103,74 @@ final class LauncherViewModel {
     func search() {
         selectedIndex     = 0
         clipSelectedIndex = 0
-        calculatorResultText = MathExpressionEvaluator.evaluate(searchQuery)
-        Task { results = await engine.search(query: searchQuery) }
-        // Search the in-memory cache — no AppleScript on each keystroke.
+        resolveUtility()
+        Task {
+            results = await engine.search(query: searchQuery)
+            instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+        }
         tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+        if let url = instantSearchTargetURL {
+            if isInstantSearchOpen {
+                instantSearchSession.load(url)
+            } else if showsInstantSearchRow {
+                instantSearchSession.prefetch(url: url)
+            }
+        }
+    }
+
+    private func resolveUtility() {
+        utilityResolveTask?.cancel()
+
+        if let currencyQuery = CurrencyQueryParser.parse(searchQuery) {
+            resolveCurrencyUtility(currencyQuery)
+            return
+        }
+
+        utilityIsLoading = false
+        utilityError = nil
+        utilityResult = UtilityParser.parse(searchQuery)
+    }
+
+    private func resolveCurrencyUtility(_ query: CurrencyQuery) {
+        let service = CurrencyConversionService.shared
+
+        if let cached = service.peekCached(query: query) {
+            utilityResult = cached
+            utilityIsLoading = false
+            utilityError = nil
+            utilityResolveTask = Task {
+                await service.refreshIfStale(base: query.fromCode, target: query.toCode)
+                guard !Task.isCancelled else { return }
+                if let updated = service.peekCached(query: query) {
+                    utilityResult = updated
+                }
+            }
+            return
+        }
+
+        utilityIsLoading = true
+        utilityError = nil
+        utilityResult = CurrencyConversionEngine.loadingPlaceholder(query: query)
+
+        utilityResolveTask = Task {
+            do {
+                let result = try await service.convert(query)
+                guard !Task.isCancelled else { return }
+                utilityIsLoading = false
+                utilityError = nil
+                utilityResult = result
+            } catch {
+                guard !Task.isCancelled else { return }
+                utilityIsLoading = false
+                if let fallback = service.peekCached(query: query) {
+                    utilityError = "Offline — showing cached rate"
+                    utilityResult = fallback
+                } else {
+                    utilityError = error.localizedDescription
+                    utilityResult = nil
+                }
+            }
+        }
     }
 
     func refreshDefaults() async {
@@ -125,9 +220,35 @@ final class LauncherViewModel {
         }
     }
 
+    // MARK: - Domain detection
+
+    /// Matches bare domains and URLs with an optional scheme, port, and path.
+    /// Requires at least one dot followed by 2+ letter TLD; rejects strings with spaces.
+    private static let domainRegex = try? NSRegularExpression(
+        pattern: #"^(https?://)?([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(:\d{1,5})?(\/[^\s]*)?$"#
+    )
+
+    var isDomainQuery: Bool {
+        guard !searchQuery.isEmpty, !searchQuery.contains(" ") else { return false }
+        let r = NSRange(searchQuery.startIndex..., in: searchQuery)
+        return Self.domainRegex?.firstMatch(in: searchQuery, range: r) != nil
+    }
+
     // MARK: - Actions
 
+    func openDomain() {
+        var raw = searchQuery.trimmingCharacters(in: .whitespaces)
+        if !raw.hasPrefix("http://") && !raw.hasPrefix("https://") {
+            raw = "https://" + raw
+        }
+        guard let url = URL(string: raw) else { return }
+        NSWorkspace.shared.open(url)
+        onLaunch?()
+    }
+
     func searchGoogle() {
+        Task { await InstantSearchUsageStore.shared.recordGoogleOpen() }
+        if isDomainQuery { openDomain(); return }
         guard !searchQuery.isEmpty,
               let encoded = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://www.google.com/search?q=\(encoded)")
@@ -136,17 +257,50 @@ final class LauncherViewModel {
         onLaunch?()
     }
 
+    func openInstantSearch() {
+        guard let url = instantSearchTargetURL else { return }
+        instantSearchSession.load(url)
+        isInstantSearchOpen = true
+        onInstantSearchChanged?(true)
+        let host = url.host ?? ""
+        Task { await InstantSearchUsageStore.shared.recordInstantOpen(host: host) }
+    }
+
+    func closeInstantSearch() {
+        guard isInstantSearchOpen else { return }
+        isInstantSearchOpen = false
+        onInstantSearchChanged?(false)
+    }
+
+    func confirmInstantSearchSelection(at contentIndex: Int) {
+        guard showsGoogleFallback else { return }
+        if showsInstantSearchRow {
+            if instantSearchFirst {
+                if contentIndex == 0 { openInstantSearch(); return }
+                if contentIndex == 1 { searchGoogle(); return }
+            } else {
+                if contentIndex == 0 { searchGoogle(); return }
+                if contentIndex == 1 { openInstantSearch(); return }
+            }
+        } else {
+            searchGoogle()
+        }
+    }
+
     func confirmSelected() {
         switch activePanel {
         case .apps:
-            if showsCalculatorRow, selectedIndex == 0 {
-                copyCalculatorResult()
+            if showsUtilityRow, selectedIndex == 0 {
+                copyUtilityResult()
                 return
             }
-            let contentIndex = selectedIndex - calculatorRowCount
-            let appCount = showsGoogleFallback ? 1 : results.count
+            let contentIndex = selectedIndex - utilityRowCount
+            let appCount = showsGoogleFallback ? webFallbackRowCount : results.count
             if contentIndex < appCount {
-                if showsGoogleFallback { searchGoogle(); return }
+                if showsGoogleFallback {
+                    confirmInstantSearchSelection(at: contentIndex)
+                    return
+                }
                 guard results.indices.contains(contentIndex) else { return }
                 launchApp(results[contentIndex])
             } else {
@@ -171,9 +325,9 @@ final class LauncherViewModel {
         }
     }
 
-    func copyCalculatorResult() {
-        guard let text = calculatorResultText, let clipVM else { return }
-        clipVM.copyPlainTextSuppressingCapture(text)
+    func copyUtilityResult() {
+        guard let result = utilityResult, !result.copyText.isEmpty, !utilityIsLoading, let clipVM else { return }
+        clipVM.copyPlainTextSuppressingCapture(result.copyText)
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -231,8 +385,18 @@ final class LauncherViewModel {
         isVisible         = false
         isExpanded        = false
         copiedClipID          = nil
-        calculatorResultText  = nil
+        utilityResolveTask?.cancel()
+        utilityResolveTask    = nil
+        utilityResult         = nil
+        utilityIsLoading      = false
+        utilityError          = nil
         ignoreHover           = true
-        Task { await refreshDefaults() }
+        isInstantSearchOpen   = false
+        instantSearchSession.reset()
+        onInstantSearchChanged?(false)
+        Task {
+            await refreshDefaults()
+            instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+        }
     }
 }

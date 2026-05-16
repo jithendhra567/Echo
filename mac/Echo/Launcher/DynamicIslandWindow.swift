@@ -37,10 +37,14 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
             rootView: DynamicIslandView()
                 .environment(viewModel)
                 .environment(clipViewModel)
+                .environment(viewModel.instantSearchSession)
         )
-        viewModel.onDismiss = { [weak self] in self?.hide() }
-        viewModel.onLaunch  = { [weak self] in self?.hideAfterLaunch() }
-        viewModel.clipVM    = clipViewModel
+        viewModel.onDismiss      = { [weak self] in self?.hide() }
+        viewModel.onLaunch       = { [weak self] in self?.hideAfterLaunch() }
+        viewModel.onInstantSearchChanged = { [weak self] open in
+            self?.applyInstantSearchLayout(open)
+        }
+        viewModel.clipVM         = clipViewModel
 
         topInsetObserver = NotificationCenter.default.addObserver(
             forName: .echoNotchTopInsetDidChange,
@@ -75,11 +79,58 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     func reposition() {
         guard let screen = NSScreen.main else { return }
-        let x = screen.frame.midX - Self.windowSize.width / 2
-        // ~28 % from top of visible area — Spotlight-style; shift down when the notch pill is expanded.
-        let baseY = screen.visibleFrame.maxY - screen.visibleFrame.height * 0.28 - Self.windowSize.height
-        let y = baseY - notchLayoutGuide.topInset
-        setFrameOrigin(NSPoint(x: x, y: max(y, screen.visibleFrame.minY)))
+        let size = frame.size
+        let visible = screen.visibleFrame
+        let x = screen.frame.midX - size.width / 2
+
+        let y: CGFloat
+        if viewModel.isInstantSearchOpen {
+            let island = DynamicIslandView.instantSearchSize(for: screen)
+            y = visible.midY - island.height / 2 - notchLayoutGuide.topInset * 0.35
+        } else {
+            let topFraction: CGFloat = 0.28
+            y = visible.maxY - visible.height * topFraction - size.height - notchLayoutGuide.topInset
+        }
+
+        let clampedY = min(max(y, visible.minY), visible.maxY - size.height)
+        setFrameOrigin(NSPoint(x: x, y: clampedY))
+    }
+
+    private func applyInstantSearchLayout(_ open: Bool) {
+        guard let screen = NSScreen.main else { return }
+        let oldFrame = frame
+        let visible = screen.visibleFrame
+        let islandPad = CGSize(width: 100, height: 100)
+
+        let newSize: CGSize
+        if open {
+            let island = DynamicIslandView.instantSearchSize(for: screen)
+            newSize = CGSize(width: island.width + islandPad.width, height: island.height + islandPad.height)
+        } else {
+            newSize = Self.windowSize
+        }
+
+        let newX = screen.frame.midX - newSize.width / 2
+        let newY: CGFloat
+        if open {
+            // Grow from the center of the current launcher island on screen.
+            let priorIslandH = DynamicIslandView.expandedHeight
+            let priorCenterY = oldFrame.maxY - priorIslandH / 2
+            newY = priorCenterY - newSize.height / 2
+        } else {
+            let topFraction: CGFloat = 0.28
+            newY = visible.maxY - visible.height * topFraction - newSize.height - notchLayoutGuide.topInset
+        }
+
+        let clampedY = min(max(newY, visible.minY), visible.maxY - newSize.height)
+        let targetFrame = NSRect(x: newX, y: clampedY, width: newSize.width, height: newSize.height)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.38
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
+            context.allowsImplicitAnimation = true
+            animator().setFrame(targetFrame, display: true)
+        }
     }
 
     // MARK: - Show / Hide
@@ -154,7 +205,12 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
                 guard let self else { return }
                 switch code {
                 case 48:      self.viewModel.switchPanel()
-                case 53:      self.hide()
+                case 53:
+                    if self.viewModel.isInstantSearchOpen {
+                        self.viewModel.closeInstantSearch()
+                    } else {
+                        self.hide()
+                    }
                 case 36, 76:
                     if event.modifierFlags.contains(.shift) {
                         self.viewModel.searchGoogle()
@@ -183,10 +239,21 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     override func mouseDown(with event: NSEvent) {
         let loc = event.locationInWindow
-        let iw: CGFloat = viewModel.isExpanded ? DynamicIslandView.expandedWidth : DynamicIslandView.pillWidth
-        let ih: CGFloat = viewModel.isExpanded ? DynamicIslandView.expandedHeight : DynamicIslandView.pillHeight
-        let ix = (Self.windowSize.width - iw) / 2
-        let iy = Self.windowSize.height - ih
+        let iw: CGFloat
+        let ih: CGFloat
+        if viewModel.isInstantSearchOpen {
+            let size = DynamicIslandView.instantSearchSize(for: NSScreen.main)
+            iw = size.width
+            ih = size.height
+        } else {
+            iw = viewModel.isExpanded ? DynamicIslandView.expandedWidth  : DynamicIslandView.pillWidth
+            ih = viewModel.isExpanded ? DynamicIslandView.expandedHeight : DynamicIslandView.pillHeight
+        }
+        let win = frame.size
+        let ix = (win.width - iw) / 2
+        let iy = viewModel.isInstantSearchOpen
+            ? (win.height - ih) / 2
+            : win.height - ih
         let islandRect = CGRect(x: ix, y: iy, width: iw, height: ih)
 
         if islandRect.contains(loc) {

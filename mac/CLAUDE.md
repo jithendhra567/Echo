@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Echo is a macOS-only menu-bar app (`LSUIElement = true`, no dock icon) combining a clipboard manager, an app launcher, and a notch panel.
+Echo is a macOS-only menu-bar app (no dock icon) combining a clipboard manager, an app launcher, and a notch panel.
+
+`NSApp.setActivationPolicy(.accessory)` is set programmatically in `AppDelegate` — **not** via `LSUIElement = true` in Info.plist. `LSUIElement` stamps `kLSServerConnectionStatusProcessIsDaemonMask` on the process, which the WebContent XPC service (backing `WKWebView` in InstantSearch) inherits, crashing on launch.
 
 - **Language:** Swift 6 (`SWIFT_VERSION = 6.0`)
 - **SDK:** macOS only (`SDKROOT = macosx`, deployment target 26.4)
@@ -38,12 +40,36 @@ Echo/
 │
 ├── Launcher/                  # App launcher (DynamicIsland-style)
 │   ├── DynamicIslandWindow.swift  # Transparent NSPanel; morphs in SwiftUI; keyboard nav
-│   ├── LauncherViewModel.swift    # Search across apps + browser tabs; clipboard panel toggle
+│   ├── LauncherViewModel.swift    # Orchestrates apps + tabs + utility + instant-search results
 │   ├── AppSearchEngine.swift      # Indexes installed apps; usage-frequency ranking
 │   ├── HotkeyManager.swift        # Carbon hotkey registration
 │   ├── LauncherSettings.swift     # UserDefaults-backed hotkey persistence; onChange callbacks
 │   ├── AppInfo.swift              # App metadata struct
-│   └── DynamicIslandView.swift    # SwiftUI search UI inside the island shape
+│   ├── DynamicIslandView.swift    # SwiftUI search UI inside the island shape
+│   ├── InstantSearch/             # In-launcher WKWebView panel
+│   │   ├── InstantSearchSession.swift     # WKWebView wrapper; prefetch (280ms delay) + load
+│   │   ├── InstantSearchURLResolver.swift # Domain vs Google search URL resolution
+│   │   ├── InstantSearchUsageStore.swift  # actor; tracks instant vs Google opens to reorder rows
+│   │   ├── InstantSearchRow.swift         # SwiftUI row shown when no app results match
+│   │   └── InstantSearchWebView.swift     # NSViewRepresentable hosting the WKWebView
+│   └── Utility/                   # Inline calculation / conversion results (shown above app rows)
+│       ├── UtilityResult.swift            # Result model: kind, copyText, previewText, detailText
+│       ├── UtilityQueryNormalizer.swift   # Trims, lowercases, collapses whitespace, fixes typos
+│       ├── UtilityParser.swift            # Dispatches to calculation / unit / datetime engines
+│       ├── UtilityFormatting.swift        # Number & unit display formatting helpers
+│       ├── UnitLexicon.swift              # Maps natural-language unit tokens to canonical types
+│       ├── WorldTimezoneLexicon.swift     # Maps city/country names to TimeZone identifiers
+│       ├── Currency/                      # Live currency conversion via Frankfurter API
+│       │   ├── CurrencyQueryParser.swift  # Detects "100 usd to eur" patterns
+│       │   ├── CurrencyConversionService.swift  # Singleton; fetches + caches rates
+│       │   ├── FrankfurterAPIClient.swift # HTTP client for api.frankfurter.app
+│       │   └── …                          # CurrencyLexicon, CurrencyQuery, cache models/store
+│       └── Engines/               # Pure computation; no I/O
+│           ├── CalculationEngine.swift
+│           ├── UnitConversionEngine.swift
+│           ├── DateTimeEngine.swift
+│           ├── TimestampEngine.swift
+│           └── WorldTimeEngine.swift
 │
 ├── Browser/                   # Browser tab access via AppleScript (Safari, Chrome, Arc)
 │   ├── BrowserTabEngine.swift # fetchTabs / focusTab via NSAppleScript on dedicated queue
@@ -63,6 +89,7 @@ Echo/
 │   ├── Modules/               # NotchModule protocol; TrayModule; MusicModule; ClockModule
 │   └── MediaRemote/           # Now-playing info via MediaRemote private framework
 │
+├── Utilities/EchoIconImage.swift  # Shared sonar-ring drawing logic for menu bar + app icon renderer
 ├── Dashboard/DashboardView.swift  # NavigationSplitView: Launcher settings, Clipboard history, About
 ├── Permissions/AccessibilityPermission.swift
 └── Info.plist
@@ -86,7 +113,9 @@ NSPasteboard ──poll 500ms──▶ ClipboardMonitor ──save──▶ Clip
                                                    │
                                             LauncherViewModel
                                             ├── AppSearchEngine
-                                            └── BrowserTabEngine ──▶ BrowserTabStore
+                                            ├── BrowserTabEngine ──▶ BrowserTabStore
+                                            ├── UtilityParser / CurrencyConversionService (inline results)
+                                            └── InstantSearchSession (WKWebView, prefetched)
 
 NSWorkspace.didActivateApplication ──▶ LauncherViewModel.recordSystemActivation()
                                         (keeps frequency rankings current)
@@ -107,6 +136,12 @@ NSWorkspace.didActivateApplication ──▶ LauncherViewModel.recordSystemActiv
 **`NSPanel` with `.nonactivatingPanel`**: `ClipboardPanel` never becomes the key window, keeping the previously active app (e.g. VS Code) focused — what makes drag-and-drop out of the panel seamless.
 
 **Suppress re-capture**: `ClipboardMonitor.suppressNextCapture()` is called before programmatic pasteboard writes (`ClipViewModel.copy`) to avoid duplicate history entries.
+
+**Utility row ordering**: `LauncherViewModel` shows results in this vertical order: (1) utility result, (2) app/tab/web rows. `selectedIndex` is offset by `utilityRowCount` when resolving which item is selected.
+
+**`InstantSearchSession` prefetch**: when `showsInstantSearchRow` becomes true, `LauncherViewModel.search()` calls `prefetch(url:)`, which waits 280ms before loading — cancels if the user keeps typing. On explicit open, `load(_:force:)` runs immediately. The `WKWebView` uses the default (persistent) `WKWebsiteDataStore` so sessions are preserved. `NSApp.setActivationPolicy(.accessory)` (not `LSUIElement`) is required for the WebContent XPC process to launch cleanly.
+
+**`InstantSearchUsageStore` row ordering**: tracks per-session how often the user opens Instant Search vs. Google in the browser. `prefersGoogleOverInstant` flips when `googleOpens > instantOpens + 2`, causing the Google row to appear above the Instant Search row in the launcher.
 
 **`ClipStore.db` as `nonisolated(unsafe)`**: SQLite is initialized synchronously in `init()` (which is `nonisolated` in Swift 6). All subsequent access flows through the actor's serial executor.
 

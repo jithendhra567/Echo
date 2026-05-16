@@ -4,10 +4,19 @@ import AppKit
 // MARK: - Dimension constants (shared with DynamicIslandWindow for hit-test math)
 
 extension DynamicIslandView {
-    static let pillWidth:      CGFloat = 120
-    static let pillHeight:     CGFloat = 34
+    static let pillWidth:    CGFloat = 120
+    static let pillHeight:   CGFloat = 34
     static let expandedWidth:  CGFloat = 720
     static let expandedHeight: CGFloat = 440
+    static let instantSearchScreenFraction: CGFloat = 0.70
+
+    static func instantSearchSize(for screen: NSScreen?) -> CGSize {
+        let frame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1280, height: 800)
+        return CGSize(
+            width: frame.width * instantSearchScreenFraction,
+            height: frame.height * instantSearchScreenFraction
+        )
+    }
 }
 
 // MARK: - Main view
@@ -15,41 +24,54 @@ extension DynamicIslandView {
 struct DynamicIslandView: View {
     @Environment(LauncherViewModel.self) private var vm
     @Environment(ClipViewModel.self)     private var clipVM
+    @Environment(InstantSearchSession.self) private var instantSession
     @FocusState private var isSearchFocused: Bool
 
     @State private var showContent    = false
     @State private var showTimestamps = false
+    @State private var instantSearchAnimating = false
+    @State private var instantSearchScale: CGFloat = 1.0
 
-    private var iw: CGFloat { vm.isExpanded ? Self.expandedWidth  : Self.pillWidth  }
-    private var ih: CGFloat { vm.isExpanded ? Self.expandedHeight : Self.pillHeight }
-    private var cr: CGFloat { vm.isExpanded ? 24 : 17 }
+    private static let launcherSpring = Animation.spring(response: 0.34, dampingFraction: 0.78)
+    private static let launcherSpringBouncy = Animation.spring(response: 0.34, dampingFraction: 0.72)
+
+    private var cr: CGFloat {
+        if vm.isInstantSearchOpen { return 20 }
+        return vm.isExpanded ? 24 : 17
+    }
+
+    private func islandW(_ geo: GeometryProxy) -> CGFloat {
+        if vm.isInstantSearchOpen {
+            return Self.instantSearchSize(for: NSScreen.main).width
+        }
+        return vm.isExpanded ? Self.expandedWidth : Self.pillWidth
+    }
+    private func islandH(_ geo: GeometryProxy) -> CGFloat {
+        if vm.isInstantSearchOpen {
+            return Self.instantSearchSize(for: NSScreen.main).height
+        }
+        return vm.isExpanded ? Self.expandedHeight : Self.pillHeight
+    }
+
+    private var islandScale: CGFloat {
+        guard vm.isVisible else { return 0.85 }
+        if vm.isInstantSearchOpen { return instantSearchScale }
+        return 1.0
+    }
+
+    private var islandScaleAnchor: UnitPoint {
+        vm.isInstantSearchOpen ? .center : .top
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                islandBackground
-                if showContent { expandedContent.transition(.opacity) }
-            }
-            .environment(\.colorScheme, .dark)
-            .frame(width: iw, height: ih)
-            .animation(
-                vm.isExpanded
-                    ? .spring(response: 0.34, dampingFraction: 0.78)
-                    : .spring(response: 0.24, dampingFraction: 0.88),
-                value: vm.isExpanded
-            )
-            .scaleEffect(vm.isVisible ? 1.0 : 0.85, anchor: .top)
-            .opacity(vm.isVisible ? 1.0 : 0)
-            .animation(.spring(response: 0.22, dampingFraction: 0.82), value: vm.isVisible)
-            .frame(width: DynamicIslandWindow.windowSize.width)
-
-            Spacer().allowsHitTesting(false)
+        GeometryReader { geo in
+            islandRoot(geo)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: vm.isInstantSearchOpen ? .center : .top
+                )
         }
-        .frame(
-            width:  DynamicIslandWindow.windowSize.width,
-            height: DynamicIslandWindow.windowSize.height,
-            alignment: .top
-        )
         .onChange(of: vm.isExpanded) { _, expanded in
             if expanded {
                 vm.expand()
@@ -68,6 +90,45 @@ struct DynamicIslandView: View {
                 showTimestamps = false
             }
         }
+        .onChange(of: vm.isInstantSearchOpen) { _, open in
+            if open {
+                isSearchFocused = false
+                instantSearchAnimating = false
+                instantSearchScale = 0.86
+                withAnimation(Self.launcherSpringBouncy) {
+                    instantSearchScale = 1.0
+                }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(140))
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                        instantSearchAnimating = true
+                    }
+                }
+            } else {
+                instantSearchAnimating = false
+                withAnimation(Self.launcherSpring) {
+                    instantSearchScale = 1.0
+                }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(120))
+                    isSearchFocused = true
+                }
+            }
+        }
+    }
+
+    private func islandRoot(_ geo: GeometryProxy) -> some View {
+        ZStack {
+            islandBackground
+            if showContent { expandedContent.transition(.opacity) }
+        }
+        .environment(\.colorScheme, .dark)
+        .frame(width: islandW(geo), height: islandH(geo))
+        .scaleEffect(islandScale, anchor: islandScaleAnchor)
+        .opacity(vm.isVisible ? 1.0 : 0)
+        .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
+        .animation(Self.launcherSpring, value: vm.isExpanded)
+        .animation(.spring(response: 0.22, dampingFraction: 0.82), value: vm.isVisible)
     }
 
     // MARK: - Background
@@ -91,9 +152,10 @@ struct DynamicIslandView: View {
             }
             .shadow(color: .black.opacity(0.28), radius: 18, y: 6)
             .shadow(color: .black.opacity(0.10), radius: 80, y: 32)
+            .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
             .animation(
                 vm.isExpanded
-                    ? .spring(response: 0.34, dampingFraction: 0.78)
+                    ? Self.launcherSpring
                     : .spring(response: 0.24, dampingFraction: 0.88),
                 value: vm.isExpanded
             )
@@ -102,20 +164,51 @@ struct DynamicIslandView: View {
     // MARK: - Expanded content
 
     private var expandedContent: some View {
+        Group {
+            if vm.isInstantSearchOpen {
+                instantSearchPanel
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .center)),
+                            removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .center))
+                        )
+                    )
+            } else {
+                VStack(spacing: 0) {
+                    searchField
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .center)))
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.07))
+                        .frame(height: 1)
+                        .padding(.horizontal, 10)
+
+                    HStack(spacing: 0) {
+                        appColumn
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(width: 1)
+                        clipColumn
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
+    }
+
+    private var instantSearchPanel: some View {
         VStack(spacing: 0) {
-            searchField
+            InstantSearchChrome()
             Rectangle()
                 .fill(Color.white.opacity(0.07))
                 .frame(height: 1)
-                .padding(.horizontal, 10)
-            HStack(spacing: 0) {
-                appColumn
-                Rectangle()
-                    .fill(Color.white.opacity(0.07))
-                    .frame(width: 1)
-                clipColumn
-            }
+            InstantSearchWebView(webView: instantSession.webView)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .opacity(instantSearchAnimating ? 1 : 0)
+                .animation(.spring(response: 0.28, dampingFraction: 0.84).delay(0.05), value: instantSearchAnimating)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Search field
@@ -126,7 +219,7 @@ struct DynamicIslandView: View {
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.white.opacity(0.45))
 
-            TextField("Search apps, clipboard and tabs…", text: Binding(
+            TextField("Search apps, clipboard, or calculate…", text: Binding(
                 get: { vm.searchQuery },
                 set: { vm.searchQuery = $0; vm.search() }
             ))
@@ -135,6 +228,27 @@ struct DynamicIslandView: View {
             .foregroundStyle(.white)
             .focused($isSearchFocused)
             .tint(.white)
+
+            if vm.utilityIsLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.white.opacity(0.5))
+            } else if let error = vm.utilityError {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            } else if let utility = vm.utilityResult {
+                Text(utility.previewText)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .transition(.opacity)
+                    .animation(.easeOut(duration: 0.12), value: utility.previewText)
+            }
 
             if !vm.searchQuery.isEmpty {
                 Button {
@@ -159,30 +273,29 @@ struct DynamicIslandView: View {
     // MARK: - Apps column (left)
 
     private var appColumn: some View {
-        let calcOffset = vm.calculatorRowCount
+        let calcOffset = vm.utilityRowCount
         return VStack(spacing: 0) {
             sectionLabel("APPS", active: vm.activePanel == .apps)
 
-            if vm.results.isEmpty && vm.tabResults.isEmpty && !vm.showsCalculatorRow {
+            if vm.results.isEmpty && vm.tabResults.isEmpty && !vm.showsUtilityRow {
                 if vm.showsGoogleFallback {
-                    GoogleSearchRow(
-                        query: vm.searchQuery,
-                        isSelected: vm.activePanel == .apps && vm.selectedIndex == calcOffset
-                    )
+                    VStack(spacing: 1) {
+                        fallbackRows(baseOffset: calcOffset)
+                    }
                     .padding(.horizontal, 6)
                     .padding(.top, 4)
-                    .onTapGesture { vm.searchGoogle() }
-                    .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = calcOffset } }
                 } else {
                     emptyLabel("No results")
                 }
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 1) {
-                        if vm.showsCalculatorRow, let result = vm.calculatorResultText {
-                            CalculatorResultRow(
+                        if vm.showsUtilityRow {
+                            UtilityResultRow(
                                 query: vm.searchQuery,
-                                result: result,
+                                result: vm.utilityResult,
+                                isLoading: vm.utilityIsLoading,
+                                errorMessage: vm.utilityError,
                                 isSelected: vm.activePanel == .apps && vm.selectedIndex == 0
                             )
                             .opacity(showContent ? 1 : 0)
@@ -191,17 +304,15 @@ struct DynamicIslandView: View {
                                 .spring(response: 0.28, dampingFraction: 0.80),
                                 value: showContent
                             )
-                            .onTapGesture { vm.selectedIndex = 0; vm.copyCalculatorResult() }
+                            .onTapGesture {
+                                vm.selectedIndex = 0
+                                vm.copyUtilityResult()
+                            }
                             .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = 0 } }
                         }
 
                         if vm.results.isEmpty && vm.tabResults.isEmpty && vm.showsGoogleFallback {
-                            GoogleSearchRow(
-                                query: vm.searchQuery,
-                                isSelected: vm.activePanel == .apps && vm.selectedIndex == calcOffset
-                            )
-                            .onTapGesture { vm.searchGoogle() }
-                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = calcOffset } }
+                            fallbackRows(baseOffset: calcOffset)
                         }
 
                         ForEach(Array(vm.results.enumerated()), id: \.element.id) { idx, app in
@@ -225,7 +336,7 @@ struct DynamicIslandView: View {
                             appsSectionDivider("TABS")
                                 .padding(.top, 4)
 
-                            let appCount = vm.showsGoogleFallback ? 1 : vm.results.count
+                            let appCount = vm.showsGoogleFallback ? vm.webFallbackRowCount : vm.results.count
                             ForEach(Array(vm.tabResults.enumerated()), id: \.element.id) { idx, tab in
                                 let globalIdx = calcOffset + appCount + idx
                                 BrowserTabResultRow(
@@ -250,6 +361,39 @@ struct DynamicIslandView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder
+    private func fallbackRows(baseOffset: Int) -> some View {
+        if vm.instantSearchFirst {
+            instantSearchRow(at: baseOffset)
+            googleRow(at: baseOffset + 1)
+        } else {
+            googleRow(at: baseOffset)
+            instantSearchRow(at: baseOffset + 1)
+        }
+    }
+
+    private func instantSearchRow(at index: Int) -> some View {
+        InstantSearchResultRow(
+            query: vm.searchQuery,
+            hostLabel: vm.instantSearchHostLabel,
+            isDomain: vm.isDomainQuery,
+            isSelected: vm.activePanel == .apps && vm.selectedIndex == index,
+            isLoading: instantSession.isLoading && vm.isInstantSearchOpen
+        )
+        .onTapGesture { vm.selectedIndex = index; vm.openInstantSearch() }
+        .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = index } }
+    }
+
+    private func googleRow(at index: Int) -> some View {
+        GoogleSearchRow(
+            query: vm.searchQuery,
+            isSelected: vm.activePanel == .apps && vm.selectedIndex == index,
+            isDomain: vm.isDomainQuery
+        )
+        .onTapGesture { vm.selectedIndex = index; vm.searchGoogle() }
+        .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = index } }
     }
 
     private func appsSectionDivider(_ label: String) -> some View {
@@ -455,39 +599,54 @@ private struct BrowserTabResultRow: View {
     }
 }
 
-// MARK: - Calculator result row
+// MARK: - Utility result row
 
-private struct CalculatorResultRow: View {
+private struct UtilityResultRow: View {
     let query: String
-    let result: String
+    let result: UtilityResult?
+    let isLoading: Bool
+    let errorMessage: String?
     let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(red: 0.35, green: 0.72, blue: 0.45).opacity(0.85))
+                    .fill(accentColor.opacity(0.85))
                     .frame(width: 26, height: 26)
-                Image(systemName: "equal")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                } else {
+                    Image(systemName: iconName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(query)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.40))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(result)
+                Text(primaryLine)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
+                if let detail = detailLine {
+                    Text(detail)
+                        .font(.system(size: 10))
+                        .foregroundColor(detailColor)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                }
             }
 
             Spacer(minLength: 0)
 
-            if isSelected {
+            if isSelected, !isLoading, result?.copyText.isEmpty == false {
                 Image(systemName: "return")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.40))
@@ -504,27 +663,59 @@ private struct CalculatorResultRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected)
     }
+
+    private var iconName: String {
+        result?.kind.systemImage ?? "dollarsign.arrow.circlepath"
+    }
+
+    private var primaryLine: String {
+        if isLoading { return "Fetching rates…" }
+        if let errorMessage { return errorMessage }
+        return result?.previewText ?? "—"
+    }
+
+    private var detailLine: String? {
+        if errorMessage != nil, let result { return result.detailText }
+        return result?.detailText
+    }
+
+    private var detailColor: Color {
+        errorMessage != nil ? .orange.opacity(0.75) : .white.opacity(0.42)
+    }
+
+    private var accentColor: Color {
+        switch result?.kind {
+        case .calculation:    return Color(red: 0.35, green: 0.55, blue: 0.95)
+        case .percentage:     return Color(red: 0.35, green: 0.72, blue: 0.45)
+        case .unitConversion: return Color(red: 0.55, green: 0.45, blue: 0.92)
+        case .dateTime:       return Color(red: 0.92, green: 0.55, blue: 0.32)
+        case .timestamp:      return Color(red: 0.32, green: 0.72, blue: 0.88)
+        case .currency:       return Color(red: 0.28, green: 0.78, blue: 0.52)
+        case .none:           return Color(red: 0.28, green: 0.78, blue: 0.52)
+        }
+    }
 }
 
-// MARK: - Google search fallback row
+// MARK: - Google search / domain navigation fallback row
 
 private struct GoogleSearchRow: View {
     let query: String
     let isSelected: Bool
+    let isDomain: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(red: 0.26, green: 0.52, blue: 0.96).opacity(0.85))
+                    .fill(iconColor.opacity(0.85))
                     .frame(width: 26, height: 26)
-                Image(systemName: "magnifyingglass")
+                Image(systemName: isDomain ? "safari" : "magnifyingglass")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
             }
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Search Google")
+                Text(isDomain ? "Open in Browser" : "Search Google")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.40))
                 Text(query)
@@ -551,6 +742,13 @@ private struct GoogleSearchRow: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected)
+        .animation(.easeInOut(duration: 0.15), value: isDomain)
+    }
+
+    private var iconColor: Color {
+        isDomain
+            ? Color(red: 0.13, green: 0.65, blue: 0.53)   // teal for browser
+            : Color(red: 0.26, green: 0.52, blue: 0.96)    // blue for Google
     }
 }
 

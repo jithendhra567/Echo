@@ -1,6 +1,7 @@
 #!/usr/bin/env swift
-// Renders Echo app icon: dark squircle + bold utility lightning (Raycast-like),
-// with a dim duplicate offset for "echo". Vector-crisp at 1024.
+// Renders Echo app icon: dark squircle + centered sonar rings.
+// Usage: swift render_app_icon.swift <output.png>
+// Keep metrics in sync with Echo/Utilities/EchoIconImage.swift
 
 import AppKit
 
@@ -11,6 +12,22 @@ guard args.count >= 2 else {
 }
 let outPath = args[1]
 let px: CGFloat = 1024
+let corner = px * 0.228
+let bgColor = NSColor(calibratedRed: 0.06, green: 0.06, blue: 0.08, alpha: 1)
+
+let radiiFractions: [CGFloat] = [0.185, 0.335, 0.485]
+let strokeFraction: CGFloat = 0.104
+let arcStart: CGFloat = 14
+let arcEnd: CGFloat = 86
+let arcMidRad = ((arcStart + arcEnd) * 0.5) * .pi / 180
+
+func arcOrigin(canvasSize: CGFloat) -> CGPoint {
+    let rMid = canvasSize * radiiFractions[1]
+    return CGPoint(
+        x: canvasSize * 0.5 - rMid * cos(arcMidRad),
+        y: canvasSize * 0.5 - rMid * sin(arcMidRad)
+    )
+}
 
 guard
     let rep = NSBitmapImageRep(
@@ -34,39 +51,30 @@ NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 
 let bounds = CGRect(x: 0, y: 0, width: px, height: px)
+bgColor.setFill()
+NSBezierPath(roundedRect: bounds, xRadius: corner, yRadius: corner).fill()
 
-let bg = NSBezierPath(roundedRect: bounds, xRadius: px * 0.228, yRadius: px * 0.228)
-NSColor(calibratedRed: 0.06, green: 0.06, blue: 0.08, alpha: 1).setFill()
-bg.fill()
+let origin = arcOrigin(canvasSize: px)
+let stroke = px * strokeFraction
+let ringColors: [NSColor] = [
+    NSColor(calibratedWhite: 1.00, alpha: 1),
+    NSColor(calibratedWhite: 0.62, alpha: 1),
+    NSColor(calibratedWhite: 0.34, alpha: 1),
+]
 
-func bolt(offset: CGPoint, scale: CGFloat) -> NSBezierPath {
-    let p = NSBezierPath()
-    p.lineJoinStyle = .round
-    let cx = px * 0.5 + offset.x
-    let cy = px * 0.5 + offset.y
-    let s = scale
-    // Chunky lightning — wide segments for legibility at 16×16 (Raycast-like weight).
-    p.move(to: CGPoint(x: cx + 0.11 * s, y: cy + 0.33 * s))
-    p.line(to: CGPoint(x: cx - 0.24 * s, y: cy - 0.05 * s))
-    p.line(to: CGPoint(x: cx + 0.03 * s, y: cy - 0.05 * s))
-    p.line(to: CGPoint(x: cx - 0.09 * s, y: cy - 0.36 * s))
-    p.line(to: CGPoint(x: cx + 0.29 * s, y: cy + 0.03 * s))
-    p.line(to: CGPoint(x: cx + 0.07 * s, y: cy + 0.07 * s))
-    p.close()
-    return p
+for i in 0..<3 {
+    let path = NSBezierPath()
+    path.lineWidth = stroke
+    path.lineCapStyle = .round
+    path.appendArc(
+        withCenter: origin,
+        radius: px * radiiFractions[i],
+        startAngle: arcStart,
+        endAngle: arcEnd
+    )
+    ringColors[i].setStroke()
+    path.stroke()
 }
-
-let s = px * 1.0
-
-// Echo layer (behind)
-let echo = bolt(offset: CGPoint(x: -px * 0.045, y: -px * 0.018), scale: s)
-NSColor(calibratedWhite: 0.20, alpha: 1).setFill()
-echo.fill()
-
-// Primary bolt
-let main = bolt(offset: CGPoint(x: px * 0.028, y: px * 0.012), scale: s)
-NSColor(calibratedWhite: 0.98, alpha: 1).setFill()
-main.fill()
 
 NSGraphicsContext.restoreGraphicsState()
 
