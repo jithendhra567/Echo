@@ -1,0 +1,299 @@
+---
+const stats = [
+  { value: '< 2s',   label: 'to find anything',     detail: 'vs. 15s switching apps' },
+  { value: '1',      label: 'keystroke to launch',   detail: 'global, always available' },
+  { value: '∞',      label: 'clipboard history',     detail: 'search everything you\'ve copied' },
+];
+
+const pillars = [
+  {
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 4v4l3 2" stroke="#a78bfa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    title: 'Instant access',
+    body: 'No dock, no taskbar, no window juggling. EchoBar answers before you\'ve left the keyboard.',
+  },
+  {
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#a78bfa" stroke-width="1.7"/><path d="M10 7v3l2 2" stroke="#a78bfa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 10H2M18 10h-2M10 2V4M10 16v2" stroke="#a78bfa" stroke-width="1.4" stroke-linecap="round" opacity="0.4"/></svg>`,
+    title: 'Stays out of the way',
+    body: 'Hidden until you call it. The notch panel blends with your display. Your workspace stays clean.',
+  },
+  {
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="#a78bfa" stroke-width="1.7"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="#a78bfa" stroke-width="1.7" opacity="0.6"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="#a78bfa" stroke-width="1.7" opacity="0.6"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="#a78bfa" stroke-width="1.7" opacity="0.35"/></svg>`,
+    title: 'Works with everything',
+    body: 'No plugins. No integrations. Works alongside every app you already use on your Mac.',
+  },
+  {
+    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L3 8v9h5v-5h4v5h5V8L10 3z" stroke="#a78bfa" stroke-width="1.7" stroke-linejoin="round"/></svg>`,
+    title: 'Your data stays local',
+    body: 'Everything — clipboard, app history, files — lives only on your Mac. No cloud, no accounts.',
+  },
+];
+---
+
+<section id="productivity" aria-labelledby="prod-title">
+  <div class="prod-wrap">
+
+    <!-- Heading -->
+    <div class="prod-head reveal">
+      <span class="section-eyebrow">Why EchoBar</span>
+      <h2 id="prod-title" class="section-h2">
+        Designed for how<br />
+        <em class="grad" style="font-style:normal;">you actually work.</em>
+      </h2>
+      <p class="section-sub">
+        Most productivity tools create more friction than they solve.
+        EchoBar is built around a single principle: get out of your way.
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" role="list">
+      {stats.map((s) => (
+        <div class="stat-card glass reveal" role="listitem">
+          <div class="stat-val grad">{s.value}</div>
+          <div class="stat-label">{s.label}</div>
+          <div class="stat-detail">{s.detail}</div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Pillars -->
+    <div class="pillars-grid" role="list">
+      {pillars.map((p) => (
+        <div class="pillar reveal" role="listitem">
+          <div class="pillar-icon" aria-hidden="true" set:html={p.icon} />
+          <div>
+            <h3 class="pillar-title">{p.title}</h3>
+            <p  class="pillar-body">{p.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Visual accent: floating command preview -->
+    <div class="cmd-preview reveal" aria-label="Example commands" role="region">
+      <div class="cmd-header">
+        <span class="cmd-header-label">Try these</span>
+      </div>
+      <div class="cmd-list" role="list">
+        {[
+          { q: 'Open Linear',          r: 'Launches Linear.app',        accent: '#818cf8' },
+          { q: '250 usd → jpy',         r: '¥ 37,850',                  accent: '#34d399' },
+          { q: 'time in São Paulo',     r: '11:42 AM BRT',               accent: '#fbbf24' },
+          { q: 'figma.com',            r: 'Opens figma.com in browser',  accent: '#38bdf8' },
+          { q: '√144 + 10% of 500',    r: '62',                          accent: '#a78bfa' },
+          { q: '30km to miles',         r: '18.64 miles',                accent: '#f97316' },
+        ].map(c => (
+          <div class="cmd-row" role="listitem">
+            <div class="cmd-q">{c.q}</div>
+            <div class="cmd-arrow" aria-hidden="true">→</div>
+            <div class="cmd-r" style={`color:${c.accent};`}>{c.r}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  #productivity {
+    padding: 120px 0;
+    position: relative;
+  }
+
+  #productivity::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 20% 50%, rgba(139,92,246,0.05), transparent);
+    pointer-events: none;
+  }
+
+  .prod-wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .prod-head {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .section-eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .section-h2 {
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+    color: #fafafa;
+    margin: 0 0 16px;
+  }
+
+  .section-sub {
+    font-size: 17px;
+    color: #71717a;
+    line-height: 1.6;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* Stats */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 64px;
+  }
+
+  .stat-card {
+    padding: 32px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-size: clamp(36px, 5vw, 52px);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fafafa;
+    margin-bottom: 6px;
+  }
+
+  .stat-detail {
+    font-size: 12px;
+    color: #52525b;
+  }
+
+  /* Pillars */
+  .pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px 64px;
+    margin-bottom: 80px;
+    padding: 48px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+  }
+
+  .pillar {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .pillar-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(167,139,250,0.1);
+    border: 1px solid rgba(167,139,250,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .pillar-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fafafa;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+    line-height: 1.3;
+  }
+
+  .pillar-body {
+    font-size: 14px;
+    color: #71717a;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* Command preview */
+  .cmd-preview {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .cmd-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .cmd-header-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #3f3f46;
+    text-transform: uppercase;
+  }
+
+  .cmd-list { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .cmd-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-right: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+
+  .cmd-row:hover { background: rgba(255,255,255,0.03); }
+
+  .cmd-row:nth-child(even) { border-right: none; }
+  .cmd-row:nth-last-child(-n+2) { border-bottom: none; }
+
+  .cmd-q {
+    font-size: 12.5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #a1a1aa;
+    min-width: 180px;
+    flex-shrink: 0;
+  }
+
+  .cmd-arrow {
+    color: #3f3f46;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .cmd-r {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .stats-row        { grid-template-columns: 1fr; }
+    .pillars-grid     { grid-template-columns: 1fr; padding: 32px 24px; gap: 32px; }
+    .cmd-list         { grid-template-columns: 1fr; }
+    .cmd-row          { border-right: none !important; }
+    .cmd-row:nth-last-child(-n+2) { border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .cmd-row:last-child { border-bottom: none; }
+  }
+</style>

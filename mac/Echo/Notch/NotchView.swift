@@ -14,21 +14,12 @@ import UniformTypeIdentifiers
 ///   per mouse move instead of a path traversal.
 /// - No `compositingGroup()` — at this size it just adds a GPU layer to
 ///   rebuild every animation frame.
-/// - **Open** waits 0.25s while the cursor stays on the pill so accidental
-///   menu-bar passes do not expand the notch. Close keeps a short debounce
-///   so quick cursor slips off the edge do not collapse.
+/// - Open/close debouncing lives in `NotchPanel` (geometry + global cursor
+///   tracking) so fast moves still register before SwiftUI `.onHover` fires.
 struct NotchView: View {
     @Environment(NotchViewModel.self) private var vm
     @Environment(NotchLayoutGuide.self) private var notchLayout
     @State private var isDropTargeted = false
-    @State private var closeTask: Task<Void, Never>?
-    @State private var openHoverTask: Task<Void, Never>?
-
-    /// Debounce when a module has content to surface (tray files).
-    private static let openHoverDebounceActive: Duration  = .milliseconds(200)
-    /// Longer debounce when idle so cursor passes near the notch to reach app
-    /// windows below (e.g. Chrome tabs) do not accidentally expand the pill.
-    private static let openHoverDebounceIdle:   Duration  = .milliseconds(500)
 
     private var openSpring: Animation {
         let s = NotchSizing.Spring.open
@@ -108,11 +99,10 @@ struct NotchView: View {
         .clipShape(shape)
         .shadow(color: .black.opacity(isOpen ? 0.16 : 0), radius: isOpen ? 26 : 0, x: 0, y: isOpen ? 12 : 0)
         .shadow(color: .black.opacity(isOpen ? 0.048 : 0), radius: isOpen ? 118 : 0, x: 0, y: isOpen ? 40 : 0)
-        .contentShape(Rectangle())          // ← cheap rect hit-test for hover
+        .contentShape(Rectangle())          // ← cheap rect hit-test for drops
         .animation(activeSpring, value: vm.notchState)
         .animation(activeSpring, value: width)
         .animation(activeSpring, value: headerHeight)
-        .onHover { handleHover($0) }
     }
 
     /// Height of the closed-bar header strip inside the pill.
@@ -170,51 +160,6 @@ struct NotchView: View {
 
     private func pillHeight() -> CGFloat {
         isOpen ? vm.activeModule.openExpandedHeight : vm.closedNotchSize.height
-    }
-
-    // MARK: - Hover
-
-    private func handleHover(_ hovering: Bool) {
-        if hovering {
-            closeTask?.cancel()
-            closeTask = nil
-            openHoverTask?.cancel()
-            openHoverTask = Task {
-                let delay = vm.anyModuleActive
-                    ? Self.openHoverDebounceActive
-                    : Self.openHoverDebounceIdle
-                try? await Task.sleep(for: delay)
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    withAnimation(openSpring) {
-                        vm.isHovering = true
-                        vm.open()
-                    }
-                }
-            }
-            return
-        }
-
-        openHoverTask?.cancel()
-        openHoverTask = nil
-        closeTask?.cancel()
-
-        // Tiny tolerance for quick cursor slips off the pill edge.
-        closeTask = Task {
-            try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(closeSpring) {
-                    vm.isHovering = false
-                    if !vm.anyModuleActive {
-                        vm.close()
-                    } else {
-                        // Keep peek-state but mark non-hover.
-                        vm.close()
-                    }
-                }
-            }
-        }
     }
 
     // MARK: - Drop routing

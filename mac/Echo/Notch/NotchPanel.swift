@@ -29,6 +29,11 @@ final class NotchPanel: NSPanel {
 
     private var menuRevealHoverStart:      Date?
     private var flatFullscreenRevealLatched = false
+    private var cursorOverPill              = false
+    nonisolated(unsafe) private var openHoverTask:  Task<Void, Never>?
+    nonisolated(unsafe) private var closeHoverTask: Task<Void, Never>?
+
+    private static let hoverDebounce = Duration.milliseconds(50)
 
     init(layoutGuide: NotchLayoutGuide) {
         self.layoutGuide = layoutGuide
@@ -74,6 +79,8 @@ final class NotchPanel: NSPanel {
         fullscreenRevealTimer?.invalidate()
         if let m = globalCursorMonitor { NSEvent.removeMonitor(m) }
         if let m = localCursorMonitor  { NSEvent.removeMonitor(m) }
+        openHoverTask?.cancel()
+        closeHoverTask?.cancel()
     }
 
     func start() {
@@ -159,9 +166,13 @@ final class NotchPanel: NSPanel {
         let screenPt = NSEvent.mouseLocation
         let windowPt = convertPoint(fromScreen: screenPt)
 
-        // Small inset buffer so cursor touching the edge still registers.
-        let pillRect   = currentPillRect().insetBy(dx: -4, dy: -4)
-        let overPill   = pillRect.contains(windowPt)
+        let pillRect = pillHoverHitRect()
+        let overPill = pillRect.contains(windowPt)
+
+        if overPill != cursorOverPill {
+            cursorOverPill = overPill
+            handlePillHoverChange(overPill)
+        }
 
         // Only accept events during a drag when the cursor is actually near the pill.
         // Accepting events for the entire window whenever any drag is in flight causes
@@ -179,6 +190,40 @@ final class NotchPanel: NSPanel {
 
         if ignoresMouseEvents != newIgnore {
             ignoresMouseEvents = newIgnore
+        }
+    }
+
+    /// Hit target for hover open — wider than the visible pill so fast top-down
+    /// moves still register before the cursor leaves the strip.
+    private func pillHoverHitRect() -> NSRect {
+        var rect = currentPillRect().insetBy(dx: -14, dy: -10)
+        rect.size.height += 22
+        rect.origin.y -= 22
+        return rect
+    }
+
+    private func handlePillHoverChange(_ overPill: Bool) {
+        if overPill {
+            closeHoverTask?.cancel()
+            closeHoverTask = nil
+            openHoverTask?.cancel()
+            openHoverTask = Task { @MainActor in
+                try? await Task.sleep(for: Self.hoverDebounce)
+                guard !Task.isCancelled, cursorOverPill else { return }
+                viewModel.isHovering = true
+                viewModel.open()
+            }
+            return
+        }
+
+        openHoverTask?.cancel()
+        openHoverTask = nil
+        closeHoverTask?.cancel()
+        closeHoverTask = Task { @MainActor in
+            try? await Task.sleep(for: Self.hoverDebounce)
+            guard !Task.isCancelled, !cursorOverPill else { return }
+            viewModel.isHovering = false
+            viewModel.close()
         }
     }
 

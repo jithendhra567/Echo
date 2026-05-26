@@ -26,6 +26,9 @@ struct ClipCardView: View {
         .onDrag { clip.itemProvider }
         .contextMenu {
             Button("Copy") { handleTap() }
+            if clip.supportsPlainTextCopy {
+                Button("Copy as Plain Text") { handlePlainTextCopy() }
+            }
             Divider()
             Button("Delete", role: .destructive) { viewModel.delete(clip) }
         }
@@ -178,6 +181,15 @@ struct ClipCardView: View {
 
     private func handleTap() {
         viewModel.copyToPasteboard(clip)
+        showCopiedThenDismiss()
+    }
+
+    private func handlePlainTextCopy() {
+        viewModel.copyToPasteboardAsPlainText(clip)
+        showCopiedThenDismiss()
+    }
+
+    private func showCopiedThenDismiss() {
         withAnimation(.spring(response: 0.22, dampingFraction: 0.72)) { isCopied = true }
         Task {
             try? await Task.sleep(for: .milliseconds(650))

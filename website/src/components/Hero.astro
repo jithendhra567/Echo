@@ -1,0 +1,568 @@
+---
+---
+
+<section id="hero" aria-label="Hero">
+  <!-- Background layers -->
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-grid"  aria-hidden="true"></div>
+
+  <!-- Notch pill at top -->
+  <div class="notch-wrap float-c" aria-hidden="true">
+    <div class="notch-pill notch-content">
+      <div class="now-playing-dot" aria-hidden="true"></div>
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+        <rect x="2" y="4" width="2" height="5" rx="1" fill="#a78bfa"/>
+        <rect x="5.5" y="2" width="2" height="9" rx="1" fill="#a78bfa" opacity="0.7"/>
+        <rect x="9" y="5" width="2" height="4" rx="1" fill="#a78bfa" opacity="0.45"/>
+      </svg>
+      <span class="now-playing-text">Fleetwood Mac — The Chain</span>
+    </div>
+  </div>
+
+  <!-- Hero content -->
+  <div class="hero-center">
+
+    <!-- Badge -->
+    <div class="hero-badge reveal" id="h-badge">
+      <span class="badge-dot" aria-hidden="true"></span>
+      <span>Now available for macOS 14+</span>
+    </div>
+
+    <!-- Headline -->
+    <h1 class="hero-h1 reveal" id="h-title">
+      Your Mac,<br />
+      <em class="grad" style="font-style:normal;">Supercharged.</em>
+    </h1>
+
+    <!-- Subline -->
+    <p class="hero-sub reveal" id="h-sub">
+      A spotlight-style productivity layer that lives in your menu bar.<br class="md-break" />
+      Search apps, convert anything, manage your clipboard — one keystroke away.
+    </p>
+
+    <!-- Animated search bar -->
+    <div class="hero-search reveal" id="h-search" aria-label="Example search queries">
+      <kbd class="cmd-key" aria-hidden="true">⌘</kbd>
+      <span class="search-divider" aria-hidden="true"></span>
+      <span id="search-text" aria-live="polite"></span>
+      <span class="cursor" aria-hidden="true"></span>
+    </div>
+
+    <!-- CTAs -->
+    <div class="hero-ctas reveal" id="h-ctas">
+      <a href="#download" class="btn-primary btn-magnetic" aria-label="Download EchoBar for Mac">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Download for Mac
+      </a>
+      <a href="#demo" class="btn-secondary btn-magnetic" aria-label="See how EchoBar works">
+        See how it works
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <!-- Scroll hint -->
+    <div class="scroll-hint reveal" id="h-scroll" aria-hidden="true">
+      <div class="scroll-line"></div>
+      <span>Scroll</span>
+    </div>
+  </div>
+
+  <!-- Floating launcher window mockup -->
+  <div class="float-window-wrap reveal float-a" id="h-window" aria-label="EchoBar launcher preview" role="img">
+    <div class="mac-window launcher-mock">
+      <div class="mac-titlebar">
+        <span class="mac-dot" style="background:#ff5f57;"></span>
+        <span class="mac-dot" style="background:#febc2e;"></span>
+        <span class="mac-dot" style="background:#28c840;"></span>
+      </div>
+
+      <!-- Search row -->
+      <div class="mock-search-row">
+        <span class="mock-cmd-key" aria-hidden="true">⌘</span>
+        <span id="mock-query">Open Figma</span>
+        <span class="cursor" style="height:14px;" aria-hidden="true"></span>
+      </div>
+
+      <!-- Divider / section -->
+      <div class="mock-section-label">APPLICATIONS</div>
+
+      <!-- Results -->
+      <div class="mock-result selected" aria-selected="true">
+        <div class="mock-icon" style="background:rgba(99,102,241,0.25);">🎨</div>
+        <span class="mock-name">Figma</span>
+        <span class="mock-ret" aria-hidden="true">↵</span>
+      </div>
+      <div class="mock-result">
+        <div class="mock-icon" style="background:rgba(59,130,246,0.2);">💻</div>
+        <span class="mock-name">VS Code</span>
+      </div>
+      <div class="mock-result">
+        <div class="mock-icon" style="background:rgba(20,184,166,0.2);">🌐</div>
+        <span class="mock-name">Arc</span>
+      </div>
+
+      <div class="mock-section-label" style="margin-top:4px;">BROWSER TABS</div>
+
+      <div class="mock-result">
+        <div class="mock-icon" style="background:rgba(249,115,22,0.2);">🔖</div>
+        <span class="mock-name" style="color:#71717a;font-size:11px;">Design System – Figma</span>
+      </div>
+      <div class="mock-result" style="margin-bottom:4px;">
+        <div class="mock-icon" style="background:rgba(236,72,153,0.2);">🔖</div>
+        <span class="mock-name" style="color:#71717a;font-size:11px;">Linear — EchoBar</span>
+      </div>
+    </div>
+
+    <!-- Floating notch-tray card -->
+    <div class="tray-float notch-pill float-b" aria-label="Notch tray preview">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M7 2v6M4 5l3 3 3-3" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 11h10" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span class="tray-label">3 files in tray</span>
+      <div class="tray-files" aria-hidden="true">
+        <div class="tray-file" style="background:#3b82f6;transform:rotate(-8deg)"></div>
+        <div class="tray-file" style="background:#8b5cf6;transform:rotate(-2deg)"></div>
+        <div class="tray-file" style="background:#ec4899;transform:rotate(5deg)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Utility card floating bottom-left -->
+  <div class="util-card glass float-b reveal" id="h-util" aria-label="Calculation preview">
+    <div class="util-query" aria-label="Query">100 USD to EUR</div>
+    <div class="util-result grad" aria-label="Result">92.14 <span style="-webkit-text-fill-color:#52525b;background:none;font-size:13px;">EUR</span></div>
+    <div class="util-detail">Live rate · Frankfurter</div>
+  </div>
+</section>
+
+<style>
+  #hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 100px 24px 60px;
+  }
+
+  /* Background */
+  .bg-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 90% 55% at 50% -5%, rgba(139,92,246,0.18) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 30% at 80% 80%,  rgba(99,102,241,0.08)  0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .bg-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 72px 72px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 80%);
+  }
+
+  /* Notch pill at top */
+  .notch-wrap {
+    position: absolute;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+
+  .notch-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    white-space: nowrap;
+  }
+
+  .now-playing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #a78bfa;
+    box-shadow: 0 0 8px rgba(167,139,250,0.8);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.8); }
+  }
+
+  .now-playing-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #a1a1aa;
+    letter-spacing: 0.01em;
+  }
+
+  /* Center content */
+  .hero-center {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+    gap: 0;
+  }
+
+  /* Badge */
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 100px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #c4b5fd;
+    letter-spacing: 0.01em;
+    margin-bottom: 28px;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #a78bfa;
+    box-shadow: 0 0 8px rgba(167,139,250,0.8);
+  }
+
+  /* Headline */
+  .hero-h1 {
+    font-size: clamp(52px, 8vw, 96px);
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.04em;
+    color: #fafafa;
+    margin: 0 0 24px;
+  }
+
+  /* Subline */
+  .hero-sub {
+    font-size: clamp(16px, 2vw, 19px);
+    font-weight: 400;
+    line-height: 1.6;
+    color: #71717a;
+    margin: 0 0 36px;
+    max-width: 560px;
+  }
+
+  .md-break { display: none; }
+  @media (min-width: 640px) { .md-break { display: inline; } }
+
+  /* Search bar */
+  .hero-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 32px;
+    box-shadow: 0 0 0 4px rgba(139,92,246,0.06), 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .cmd-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    font-size: 14px;
+    color: #71717a;
+    font-style: normal;
+    flex-shrink: 0;
+  }
+
+  .search-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+
+  #search-text {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+    color: #fafafa;
+    text-align: left;
+    min-height: 22px;
+  }
+
+  /* CTAs */
+  .hero-ctas {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: #a78bfa;
+    color: #09090b;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 100px;
+    text-decoration: none;
+    letter-spacing: -0.01em;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 32px rgba(139,92,246,0.35);
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover {
+    background: #c4b5fd;
+    box-shadow: 0 0 48px rgba(139,92,246,0.5);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: #a1a1aa;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 100px;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.09);
+    color: #fafafa;
+    border-color: rgba(255,255,255,0.16);
+  }
+
+  /* Scroll hint */
+  .scroll-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #3f3f46;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .scroll-line {
+    width: 1px;
+    height: 36px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+    border-radius: 1px;
+  }
+
+  /* Floating launcher window */
+  .float-window-wrap {
+    position: absolute;
+    right: max(24px, calc(50% - 640px + 24px));
+    top: 50%;
+    transform: translateY(-50%) rotate(-1.5deg);
+    z-index: 3;
+    width: 320px;
+  }
+
+  .launcher-mock { width: 100%; }
+
+  /* Mock search row */
+  .mock-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .mock-cmd-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    font-size: 12px;
+    color: #71717a;
+    flex-shrink: 0;
+  }
+
+  #mock-query {
+    font-size: 13px;
+    font-weight: 500;
+    color: #fafafa;
+    flex: 1;
+  }
+
+  .mock-section-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #3f3f46;
+    letter-spacing: 0.1em;
+    padding: 10px 14px 4px;
+  }
+
+  .mock-result {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    border-radius: 0;
+    transition: background 0.15s;
+  }
+
+  .mock-result.selected {
+    background: rgba(139,92,246,0.15);
+    border-left: 2px solid #a78bfa;
+  }
+
+  .mock-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .mock-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #fafafa;
+    flex: 1;
+  }
+
+  .mock-ret {
+    font-size: 12px;
+    color: #a78bfa;
+    font-weight: 600;
+  }
+
+  /* Tray float card */
+  .tray-float {
+    position: absolute;
+    bottom: -40px;
+    left: -60px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    z-index: 5;
+  }
+
+  .tray-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #a1a1aa;
+  }
+
+  .tray-files {
+    display: flex;
+    position: relative;
+    width: 42px;
+    height: 30px;
+  }
+
+  .tray-file {
+    position: absolute;
+    width: 22px;
+    height: 28px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .tray-file:nth-child(1) { left: 0; top: 0; }
+  .tray-file:nth-child(2) { left: 8px; top: 1px; }
+  .tray-file:nth-child(3) { left: 16px; top: 0; }
+
+  /* Utility card */
+  .util-card {
+    position: absolute;
+    left: max(24px, calc(50% - 640px + 24px));
+    bottom: 18%;
+    padding: 16px 20px;
+    z-index: 3;
+    width: 220px;
+  }
+
+  .util-query {
+    font-size: 11px;
+    color: #52525b;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .util-result {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .util-detail {
+    font-size: 10px;
+    color: #3f3f46;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  /* Responsive: hide floating windows on small screens */
+  @media (max-width: 1024px) {
+    .float-window-wrap { display: none; }
+    .util-card         { display: none; }
+    .notch-wrap        { top: 72px; }
+  }
+
+  @media (max-width: 640px) {
+    #hero { padding: 120px 20px 40px; }
+    .hero-ctas { flex-direction: column; width: 100%; }
+    .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+    .hero-search { max-width: 100%; }
+  }
+</style>

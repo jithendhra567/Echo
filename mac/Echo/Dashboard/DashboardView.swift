@@ -290,6 +290,9 @@ struct ClipboardHistoryPane: View {
                             ClipCardView(clip: clip)
                                 .contextMenu {
                                     Button("Copy") { clipVM.copy(clip) }
+                                    if clip.supportsPlainTextCopy {
+                                        Button("Copy as Plain Text") { clipVM.copyAsPlainText(clip) }
+                                    }
                                     Divider()
                                     Button("Delete", role: .destructive) { clipVM.delete(clip) }
                                 }

@@ -7,11 +7,16 @@ actor AppSearchEngine {
 
     private static let usageKey = "echo_launcher_usage"
 
-    private static var searchRoots: [String] {
+    /// Directories scanned for `.app` bundles and watched for installs/uninstalls.
+    static var applicationDirectoryPaths: [String] {
         let fm = FileManager.default
         var roots: [String] = [
             "/System/Applications",
             "/System/Applications/Utilities",
+            // Safari ships from a System Cryptex on modern macOS; `/Applications/Safari.app`
+            // is a symlink to here, and `FileManager.enumerator(at:)` does not yield
+            // symlinks, so we have to scan the Cryptex root directly.
+            "/System/Cryptexes/App/System/Applications",
         ]
         roots += fm.urls(for: .applicationDirectory, in: .localDomainMask).map(\.path)
         roots += fm.urls(for: .applicationDirectory, in: .userDomainMask).map(\.path)
@@ -58,7 +63,7 @@ actor AppSearchEngine {
         var seen = Set<String>()
         var apps: [AppInfo] = []
 
-        for root in Self.searchRoots {
+        for root in Self.applicationDirectoryPaths {
             let dir = URL(fileURLWithPath: root)
             guard let enumerator = fm.enumerator(
                 at: dir,

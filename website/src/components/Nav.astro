@@ -1,0 +1,216 @@
+---
+---
+
+<header id="nav" role="banner">
+  <nav class="nav-inner" aria-label="Main navigation">
+
+    <!-- Logo -->
+    <a href="/" class="nav-logo" aria-label="EchoBar home">
+      <!-- Echo sonar-ring icon (SVG) -->
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <path d="M6 14 A10 10 0 0 1 22 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" opacity="0.35"/>
+        <path d="M9 14 A7  7  0 0 1 19 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" opacity="0.65"/>
+        <path d="M12 14 A4  4  0 0 1 16 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span>EchoBar</span>
+    </a>
+
+    <!-- Links -->
+    <ul class="nav-links" role="list">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#demo">How it works</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+
+    <!-- CTA -->
+    <a href="#download" class="nav-cta" aria-label="Download EchoBar">
+      Download
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 11h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </a>
+
+    <!-- Mobile menu toggle -->
+    <button class="nav-menu-btn" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- Mobile menu -->
+  <div id="mobile-menu" class="mobile-menu" hidden aria-label="Mobile navigation">
+    <a href="#features">Features</a>
+    <a href="#demo">How it works</a>
+    <a href="#download">Download</a>
+    <a href="#download" class="mobile-cta">Download for Mac</a>
+  </div>
+</header>
+
+<style>
+  header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s;
+    border-bottom: 1px solid transparent;
+  }
+
+  header.scrolled {
+    background: rgba(9,9,11,0.82);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-bottom-color: rgba(255,255,255,0.06);
+  }
+
+  .nav-inner {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 40px;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: #fafafa;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+  }
+
+  .nav-logo svg { flex-shrink: 0; }
+
+  .nav-links {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 32px;
+    flex: 1;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: #71717a;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: #fafafa; }
+
+  .nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: rgba(167,139,250,0.12);
+    border: 1px solid rgba(167,139,250,0.25);
+    border-radius: 100px;
+    color: #c4b5fd;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .nav-cta:hover {
+    background: rgba(167,139,250,0.2);
+    border-color: rgba(167,139,250,0.4);
+    color: #ddd6fe;
+  }
+
+  .nav-menu-btn {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-left: auto;
+  }
+
+  .nav-menu-btn span {
+    display: block;
+    width: 20px;
+    height: 1.5px;
+    background: #a1a1aa;
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  .mobile-menu {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 24px 24px;
+    background: rgba(9,9,11,0.96);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    gap: 4px;
+  }
+
+  .mobile-menu a {
+    padding: 12px 0;
+    color: #a1a1aa;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 500;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: color 0.2s;
+  }
+
+  .mobile-menu a:hover { color: #fafafa; }
+  .mobile-menu a:last-child { border: none; }
+
+  .mobile-cta {
+    margin-top: 12px;
+    padding: 14px !important;
+    background: rgba(167,139,250,0.12);
+    border: 1px solid rgba(167,139,250,0.25) !important;
+    border-radius: 12px;
+    color: #c4b5fd !important;
+    text-align: center;
+    font-weight: 600 !important;
+  }
+
+  @media (max-width: 768px) {
+    .nav-links { display: none; }
+    .nav-cta   { display: none; }
+    .nav-menu-btn { display: flex; }
+  }
+</style>
+
+<script>
+  // Scroll-based nav background
+  const header = document.getElementById('nav')!;
+  window.addEventListener('scroll', () => {
+    header.classList.toggle('scrolled', window.scrollY > 20);
+  }, { passive: true });
+
+  // Mobile menu toggle
+  const btn  = header.querySelector('.nav-menu-btn') as HTMLButtonElement;
+  const menu = document.getElementById('mobile-menu')!;
+  btn.addEventListener('click', () => {
+    const open = !menu.hidden;
+    menu.hidden = open;
+    btn.setAttribute('aria-expanded', String(!open));
+  });
+
+  // Close mobile menu on link click
+  menu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    });
+  });
+</script>

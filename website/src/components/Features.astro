@@ -1,0 +1,367 @@
+---
+const features = [
+  {
+    id: 'search',
+    title: 'Instant App Search',
+    body: 'Find any app in milliseconds. Results are ranked by how you actually use them, so the apps you open most are always first.',
+    accent: '#818cf8',
+    accentDim: 'rgba(99,102,241,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <circle cx="9.5" cy="9.5" r="6.5" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M14.5 14.5 L19 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>`,
+    span: 'col-span-2',
+    demo: 'search',
+  },
+  {
+    id: 'music',
+    title: 'Now Playing — In Your Notch',
+    body: 'Album art, track info, and controls live in the menu bar notch. Any audio app, no plugins.',
+    accent: '#ec4899',
+    accentDim: 'rgba(236,72,153,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect x="3" y="7" width="3" height="8" rx="1.5" fill="currentColor"/>
+      <rect x="8" y="3" width="3" height="16" rx="1.5" fill="currentColor" opacity="0.7"/>
+      <rect x="13" y="9" width="3" height="6" rx="1.5" fill="currentColor" opacity="0.45"/>
+      <rect x="18" y="6" width="2" height="10" rx="1" fill="currentColor" opacity="0.3"/>
+    </svg>`,
+    span: 'col-span-1',
+  },
+  {
+    id: 'tray',
+    title: 'Drag Tray',
+    body: 'Drop files onto the notch pill. They sit ready to drag into any app — without opening Finder.',
+    accent: '#f97316',
+    accentDim: 'rgba(249,115,22,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M11 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M7 9l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 15v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>`,
+    span: 'col-span-1',
+  },
+  {
+    id: 'clipboard',
+    title: 'Clipboard History',
+    body: 'Everything you\'ve ever copied is searchable, draggable, and one keystroke away. Text, images, rich text — all of it.',
+    accent: '#a78bfa',
+    accentDim: 'rgba(167,139,250,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect x="5" y="3" width="12" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M8 8h6M8 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <rect x="8" y="1" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+    </svg>`,
+    span: 'col-span-2',
+  },
+  {
+    id: 'calc',
+    title: 'Instant Calculations',
+    body: 'Math, percentages, tip splits, unit conversions, live currency rates — computed inline as you type.',
+    accent: '#34d399',
+    accentDim: 'rgba(52,211,153,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M4 11h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M11 4v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.4" opacity="0.3"/>
+    </svg>`,
+    span: 'col-span-1',
+  },
+  {
+    id: 'tabs',
+    title: 'Browser Tab Search',
+    body: 'Search open tabs across Safari, Chrome, and Arc. Closed tabs stay in history — find any page you\'ve ever visited.',
+    accent: '#38bdf8',
+    accentDim: 'rgba(56,189,248,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect x="2" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M2 9h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="5" y="6.5" width="5" height="2.5" rx="1" fill="currentColor" opacity="0.5"/>
+    </svg>`,
+    span: 'col-span-1',
+  },
+  {
+    id: 'currency',
+    title: 'World Time & Currency',
+    body: 'Live exchange rates. Current time in any city. All from the search bar, offline-capable with cached rates.',
+    accent: '#fbbf24',
+    accentDim: 'rgba(251,191,36,0.12)',
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M11 6v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 11h1.5M17.5 11H19M11 3v1.5M11 17.5V19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.4"/>
+    </svg>`,
+    span: 'col-span-1',
+  },
+];
+---
+
+<section id="features" aria-labelledby="features-title">
+  <div class="section-wrap">
+
+    <!-- Heading -->
+    <div class="section-head reveal">
+      <span class="section-eyebrow">Features</span>
+      <h2 id="features-title" class="section-h2">
+        Everything you need,<br />
+        <em class="grad" style="font-style:normal;">nothing you don't.</em>
+      </h2>
+      <p class="section-sub">
+        Seven tools, one keystroke. No apps to switch, no windows to juggle.
+      </p>
+    </div>
+
+    <!-- Feature grid -->
+    <div class="feat-grid" role="list">
+      {features.map((f) => (
+        <article
+          class={`feat-card glass reveal ${f.span}`}
+          role="listitem"
+          style={`--feat-accent:${f.accent}; --feat-dim:${f.accentDim};`}
+        >
+          <div class="feat-icon" style={`background:${f.accentDim}; color:${f.accent};`}
+               aria-hidden="true" set:html={f.icon} />
+          <div class="feat-body">
+            <h3 class="feat-title">{f.title}</h3>
+            <p  class="feat-desc">{f.body}</p>
+          </div>
+
+          {f.id === 'calc' && (
+            <div class="feat-calc-demo" aria-hidden="true">
+              <div class="calc-row">
+                <span class="calc-q">15% of 280</span>
+                <span class="calc-a" style={`color:${f.accent};`}>42</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-q">100 kg to lb</span>
+                <span class="calc-a" style={`color:${f.accent};`}>220.46 lb</span>
+              </div>
+              <div class="calc-row">
+                <span class="calc-q">time in Tokyo</span>
+                <span class="calc-a" style={`color:${f.accent};`}>09:41 JST</span>
+              </div>
+            </div>
+          )}
+
+          {f.id === 'clipboard' && (
+            <div class="feat-clip-demo" aria-hidden="true">
+              <div class="clip-item selected-clip">
+                <div class="clip-icon">T</div>
+                <div class="clip-text">npm install tailwindcss gsap</div>
+                <div class="clip-source">Terminal</div>
+              </div>
+              <div class="clip-item">
+                <div class="clip-icon" style="background:rgba(56,189,248,0.2);color:#38bdf8;">🔗</div>
+                <div class="clip-text" style="color:#71717a;">https://figma.com/file/...</div>
+                <div class="clip-source">Chrome</div>
+              </div>
+              <div class="clip-item">
+                <div class="clip-icon" style="background:rgba(52,211,153,0.2);color:#34d399;">T</div>
+                <div class="clip-text" style="color:#71717a;">Meeting at 3pm tomorrow</div>
+                <div class="clip-source">Notes</div>
+              </div>
+            </div>
+          )}
+
+          <!-- Accent glow -->
+          <div class="feat-glow" aria-hidden="true"
+               style={`background: radial-gradient(circle at 0% 100%, ${f.accentDim} 0%, transparent 70%);`}>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  #features {
+    padding: 120px 0;
+    position: relative;
+  }
+
+  .section-wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Section heading */
+  .section-head {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .section-eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .section-h2 {
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+    color: #fafafa;
+    margin: 0 0 16px;
+  }
+
+  .section-sub {
+    font-size: 17px;
+    color: #71717a;
+    line-height: 1.6;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  /* Feature grid – 3 columns, bento layout */
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .col-span-1 { grid-column: span 1; }
+  .col-span-2 { grid-column: span 2; }
+
+  .feat-card {
+    position: relative;
+    overflow: hidden;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 200px;
+    cursor: default;
+  }
+
+  .feat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .feat-body { flex: 1; }
+
+  .feat-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fafafa;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    line-height: 1.3;
+  }
+
+  .feat-desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #71717a;
+    margin: 0;
+  }
+
+  /* Accent glow overlay */
+  .feat-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Calculation demo */
+  .feat-calc-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+  }
+
+  .calc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+  }
+
+  .calc-q { color: #52525b; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .calc-a { font-weight: 700; font-size: 13px; }
+
+  /* Clipboard demo */
+  .feat-clip-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .clip-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+
+  .selected-clip {
+    background: rgba(167,139,250,0.08);
+    border-color: rgba(167,139,250,0.2);
+  }
+
+  .clip-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(167,139,250,0.2);
+    color: #a78bfa;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .clip-text {
+    font-size: 11px;
+    color: #fafafa;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .clip-source {
+    font-size: 10px;
+    color: #3f3f46;
+    flex-shrink: 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .feat-grid {
+      grid-template-columns: 1fr;
+    }
+    .col-span-2 { grid-column: span 1; }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .feat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .col-span-2 { grid-column: span 2; }
+  }
+</style>

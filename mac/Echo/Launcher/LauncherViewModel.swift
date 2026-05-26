@@ -13,6 +13,10 @@ final class LauncherViewModel {
     var isExpanded: Bool = false
     var isVisible: Bool = false
     var copiedClipID: UUID? = nil
+    /// Set to the row id of the app being launched while we're waiting for the
+    /// system to finish bringing it up. The row swaps its ↩︎ affordance for a
+    /// spinner so the user gets immediate feedback for slow-launching apps.
+    var launchingAppID: UUID? = nil
     var utilityResult: UtilityResult? = nil
     var utilityIsLoading: Bool = false
     var utilityError: String? = nil
@@ -37,6 +41,7 @@ final class LauncherViewModel {
 
     private var cachedAllTabs: [BrowserTab] = []
     private var tabPollerTask: Task<Void, Never>?
+    private var appIndexWatcher: AppIndexWatcher?
 
     enum ActivePanel { case apps, clipboard }
 
@@ -95,6 +100,11 @@ final class LauncherViewModel {
         Task {
             await engine.indexApps()
             await refreshDefaults()
+        }
+        appIndexWatcher = AppIndexWatcher(paths: AppSearchEngine.applicationDirectoryPaths) { [weak self] in
+            Task { @MainActor in
+                await self?.reindexApps()
+            }
         }
     }
 
@@ -175,6 +185,12 @@ final class LauncherViewModel {
 
     func refreshDefaults() async {
         results = await engine.search(query: "")
+    }
+
+    /// Rebuilds the installed-app index (e.g. after a new install) and refreshes visible results.
+    func reindexApps() async {
+        await engine.indexApps()
+        results = await engine.search(query: searchQuery)
     }
 
     func refreshTabs() async {
@@ -318,7 +334,17 @@ final class LauncherViewModel {
     func copyClip(_ clip: Clip) {
         guard let clipVM else { return }
         copiedClipID = clip.id
-        clipVM.copy(clip)
+        clipVM.copyToPasteboard(clip)
+        Task {
+            try? await Task.sleep(for: .milliseconds(420))
+            dismiss()
+        }
+    }
+
+    func copyClipAsPlainText(_ clip: Clip) {
+        guard let clipVM, clip.supportsPlainTextCopy else { return }
+        copiedClipID = clip.id
+        clipVM.copyToPasteboardAsPlainText(clip)
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -335,11 +361,35 @@ final class LauncherViewModel {
     }
 
     func launchApp(_ app: AppInfo) {
-        NSWorkspace.shared.open(app.bundleURL)
         if let bid = app.bundleIdentifier {
             Task { await engine.recordUsage(bundleID: bid) }
         }
-        onLaunch?()
+
+        // Already-running apps activate instantly; skip the spinner to avoid
+        // a one-frame flash before the dismiss animation starts.
+        if isAppAlreadyRunning(app) {
+            NSWorkspace.shared.open(app.bundleURL)
+            onLaunch?()
+            return
+        }
+
+        launchingAppID = app.id
+        Task { @MainActor in
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            _ = try? await NSWorkspace.shared.openApplication(at: app.bundleURL, configuration: config)
+            // The user may have launched a different app or dismissed the
+            // launcher while we were waiting; only dismiss if this is still
+            // the active launch.
+            guard launchingAppID == app.id else { return }
+            launchingAppID = nil
+            onLaunch?()
+        }
+    }
+
+    private func isAppAlreadyRunning(_ app: AppInfo) -> Bool {
+        guard let bid = app.bundleIdentifier else { return false }
+        return !NSRunningApplication.runningApplications(withBundleIdentifier: bid).isEmpty
     }
 
     /// Records a system-wide app activation so frequency rankings stay accurate
@@ -366,6 +416,7 @@ final class LauncherViewModel {
     func dismiss() { onDismiss?() }
 
     func expand() {
+        Task { await reindexApps() }
         tabPollerTask?.cancel()
         tabPollerTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -385,6 +436,7 @@ final class LauncherViewModel {
         isVisible         = false
         isExpanded        = false
         copiedClipID          = nil
+        launchingAppID        = nil
         utilityResolveTask?.cancel()
         utilityResolveTask    = nil
         utilityResult         = nil

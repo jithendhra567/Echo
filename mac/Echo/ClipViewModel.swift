@@ -33,6 +33,11 @@ final class ClipViewModel {
         onDismiss?()
     }
 
+    func copyAsPlainText(_ clip: Clip) {
+        copyToPasteboardAsPlainText(clip)
+        onDismiss?()
+    }
+
     /// Writes plain text to the pasteboard without recording a new clip.
     func copyPlainTextSuppressingCapture(_ text: String) {
         monitor.suppressNextCapture()
@@ -59,6 +64,16 @@ final class ClipViewModel {
         case .image:
             if let img = clip.image { pb.writeObjects([img]) }
         }
+    }
+
+    /// Writes only `public.plain-text` — no RTF, images, or URL objects.
+    func copyToPasteboardAsPlainText(_ clip: Clip) {
+        guard clip.supportsPlainTextCopy,
+              let text = clip.resolvedPlainText
+        else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        copyPlainTextSuppressingCapture(trimmed)
     }
 
     func delete(_ clip: Clip) {

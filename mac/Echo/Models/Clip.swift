@@ -49,6 +49,23 @@ struct Clip: Identifiable, Sendable {
         )
     }
 
+    /// Plain-text payload for copy-as-plain-text (strips RTF formatting).
+    var resolvedPlainText: String? {
+        switch contentType {
+        case .plainText, .url:
+            return plainText
+        case .richText:
+            return attributedString?.string
+        case .image:
+            return nil
+        }
+    }
+
+    var supportsPlainTextCopy: Bool {
+        guard let text = resolvedPlainText else { return false }
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     // MARK: - App icon (looked up at display time via bundle ID)
 
     var appIcon: NSImage? {

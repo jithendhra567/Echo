@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://echobar.app/sitemap-index.xml

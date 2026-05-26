@@ -319,7 +319,8 @@ struct DynamicIslandView: View {
                             let globalIdx = calcOffset + idx
                             AppResultRow(
                                 app: app,
-                                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
+                                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                                isLaunching: vm.launchingAppID == app.id
                             )
                             .opacity(showContent ? 1 : 0)
                             .offset(y: showContent ? 0 : -6)
@@ -440,16 +441,21 @@ struct DynamicIslandView: View {
                             .onTapGesture { vm.copyClip(clip) }
                             .onHover { if $0 && !vm.ignoreHover { vm.clipSelectedIndex = idx } }
                             .contextMenu {
-                                Button {
-                                    clipVM.pin(clip)
-                                } label: {
+                                Button { vm.copyClip(clip) } label: {
+                                    Label("Copy", systemImage: "doc.on.doc")
+                                }
+                                if clip.supportsPlainTextCopy {
+                                    Button { vm.copyClipAsPlainText(clip) } label: {
+                                        Label("Copy as Plain Text", systemImage: "doc.plaintext")
+                                    }
+                                }
+                                Divider()
+                                Button { clipVM.pin(clip) } label: {
                                     Label(clip.isPinned ? "Unpin" : "Pin",
                                           systemImage: clip.isPinned ? "pin.slash" : "pin")
                                 }
                                 Divider()
-                                Button(role: .destructive) {
-                                    clipVM.delete(clip)
-                                } label: {
+                                Button(role: .destructive) { clipVM.delete(clip) } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
@@ -757,6 +763,7 @@ private struct GoogleSearchRow: View {
 private struct AppResultRow: View {
     let app: AppInfo
     let isSelected: Bool
+    var isLaunching: Bool = false
 
     private static var iconCache: [String: NSImage] = [:]
     private var cachedIcon: NSImage {
@@ -785,17 +792,26 @@ private struct AppResultRow: View {
         .padding(.vertical, 7)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.10) : Color.clear)
+                .fill(isLaunching || isSelected ? Color.white.opacity(0.10) : Color.clear)
         }
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected)
+        .animation(.easeInOut(duration: 0.18), value: isLaunching)
         .overlay(alignment: .trailing) {
-            if isSelected {
-                Image(systemName: "return")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.40))
-                    .padding(.trailing, 9)
-                    .transition(.opacity.combined(with: .scale(scale: 0.7)))
+            Group {
+                if isLaunching {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white.opacity(0.55))
+                        .padding(.trailing, 9)
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                } else if isSelected {
+                    Image(systemName: "return")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.40))
+                        .padding(.trailing, 9)
+                        .transition(.opacity.combined(with: .scale(scale: 0.7)))
+                }
             }
         }
     }

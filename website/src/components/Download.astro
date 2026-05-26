@@ -1,0 +1,332 @@
+---
+---
+
+<section id="download" aria-labelledby="dl-title">
+
+  <!-- Top divider glow -->
+  <div class="dl-glow" aria-hidden="true"></div>
+
+  <div class="dl-wrap">
+
+    <!-- Echo icon -->
+    <div class="dl-icon reveal" aria-hidden="true">
+      <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+        <circle cx="36" cy="36" r="35" fill="rgba(167,139,250,0.06)" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+        <path d="M16 36 A28 28 0 0 1 56 36" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" opacity="0.25"/>
+        <path d="M22 36 A20 20 0 0 1 50 36" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" opacity="0.55"/>
+        <path d="M28 36 A12 12 0 0 1 44 36" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- Heading -->
+    <div class="dl-head reveal">
+      <h2 id="dl-title" class="dl-h2">
+        Ready when<br />
+        <em class="grad" style="font-style:normal;">you are.</em>
+      </h2>
+      <p class="dl-sub">
+        Free download. No account. No subscription.<br />
+        Just open it and press <kbd class="inline-key">⌘ Space</kbd>.
+      </p>
+    </div>
+
+    <!-- Download buttons -->
+    <div class="dl-buttons reveal">
+      <a href="#" class="dl-btn primary btn-magnetic" aria-label="Download EchoBar for Apple Silicon Mac">
+        <div class="dl-btn-icon" aria-hidden="true">
+          <!-- Apple Silicon chip icon -->
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="6" y="6" width="8" height="8" rx="2" fill="currentColor"/>
+            <rect x="4" y="1" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="9.25" y="1" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="14.5" y="4" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="14.5" y="9.25" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="14.5" y="14.5" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="4" y="14.5" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="9.25" y="14.5" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="2.5" y="4" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="2.5" y="9.25" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+            <rect x="2.5" y="14.5" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="dl-btn-text">
+          <span class="dl-btn-label">Apple Silicon</span>
+          <span class="dl-btn-sub">M1, M2, M3, M4</span>
+        </div>
+        <div class="dl-btn-arrow" aria-hidden="true">↓</div>
+      </a>
+
+      <a href="#" class="dl-btn secondary btn-magnetic" aria-label="Download EchoBar for Intel Mac">
+        <div class="dl-btn-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 5V4a1 1 0 011-1h4a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M7 15v1a1 1 0 001 1h4a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <rect x="7" y="8" width="6" height="4" rx="1" fill="currentColor" opacity="0.3"/>
+          </svg>
+        </div>
+        <div class="dl-btn-text">
+          <span class="dl-btn-label">Intel Mac</span>
+          <span class="dl-btn-sub">x86_64</span>
+        </div>
+        <div class="dl-btn-arrow" aria-hidden="true">↓</div>
+      </a>
+    </div>
+
+    <!-- Meta info -->
+    <div class="dl-meta reveal">
+      <span class="dl-version">Version 1.0.0</span>
+      <span class="dl-sep" aria-hidden="true">·</span>
+      <span>macOS 14 Sonoma or later</span>
+      <span class="dl-sep" aria-hidden="true">·</span>
+      <span>Free</span>
+    </div>
+
+    <!-- System requirements -->
+    <div class="dl-reqs reveal">
+      <details class="reqs-details">
+        <summary class="reqs-summary">System requirements</summary>
+        <ul class="reqs-list" role="list">
+          <li>macOS 14 Sonoma or later</li>
+          <li>Apple Silicon (M1+) or Intel processor</li>
+          <li>Accessibility permission (for global hotkeys)</li>
+          <li>~12 MB disk space</li>
+          <li>No internet required (currency rates cached offline)</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  #download {
+    position: relative;
+    padding: 140px 24px 120px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .dl-glow {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(167,139,250,0.4), transparent);
+  }
+
+  #download::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(139,92,246,0.12), transparent 60%);
+    pointer-events: none;
+  }
+
+  .dl-wrap {
+    position: relative;
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+
+  /* Icon */
+  .dl-icon {
+    width: 72px;
+    height: 72px;
+    animation: float-c 4s ease-in-out infinite;
+  }
+
+  /* Heading */
+  .dl-head { margin-bottom: 8px; }
+
+  .dl-h2 {
+    font-size: clamp(44px, 7vw, 76px);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 1.04;
+    color: #fafafa;
+    margin: 0 0 20px;
+  }
+
+  .dl-sub {
+    font-size: 17px;
+    color: #71717a;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .inline-key {
+    display: inline-block;
+    padding: 2px 10px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    font-size: 14px;
+    color: #a1a1aa;
+    font-style: normal;
+    letter-spacing: 0.01em;
+    font-family: var(--font);
+    vertical-align: baseline;
+  }
+
+  /* Download buttons */
+  .dl-buttons {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .dl-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 28px;
+    border-radius: 16px;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    min-width: 220px;
+  }
+
+  .dl-btn.primary {
+    background: #a78bfa;
+    color: #09090b;
+    box-shadow: 0 0 40px rgba(139,92,246,0.35), 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .dl-btn.primary:hover {
+    background: #c4b5fd;
+    box-shadow: 0 0 60px rgba(139,92,246,0.5), 0 4px 24px rgba(0,0,0,0.3);
+    transform: translateY(-2px);
+  }
+
+  .dl-btn.secondary {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: #a1a1aa;
+  }
+
+  .dl-btn.secondary:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+    color: #fafafa;
+    transform: translateY(-2px);
+  }
+
+  .dl-btn-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.12);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .dl-btn.secondary .dl-btn-icon {
+    background: rgba(255,255,255,0.07);
+  }
+
+  .dl-btn-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  .dl-btn-label {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .dl-btn-sub {
+    font-size: 12px;
+    opacity: 0.65;
+    font-weight: 500;
+  }
+
+  .dl-btn-arrow {
+    font-size: 18px;
+    font-weight: 300;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+
+  /* Meta */
+  .dl-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #3f3f46;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .dl-version {
+    color: #52525b;
+    font-weight: 600;
+  }
+
+  .dl-sep { color: #27272a; }
+
+  /* Requirements */
+  .dl-reqs { width: 100%; max-width: 400px; }
+
+  .reqs-details {
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .reqs-summary {
+    padding: 12px 18px;
+    font-size: 13px;
+    color: #52525b;
+    font-weight: 500;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s;
+  }
+
+  .reqs-summary:hover { color: #a1a1aa; }
+
+  .reqs-summary::before {
+    content: '›';
+    font-size: 16px;
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+
+  details[open] .reqs-summary::before { transform: rotate(90deg); }
+
+  .reqs-list {
+    padding: 0 18px 14px 32px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .reqs-list li {
+    font-size: 12.5px;
+    color: #52525b;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 520px) {
+    .dl-buttons { flex-direction: column; align-items: stretch; }
+    .dl-btn { min-width: unset; }
+  }
+</style>
