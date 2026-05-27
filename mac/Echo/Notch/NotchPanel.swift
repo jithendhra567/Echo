@@ -193,13 +193,42 @@ final class NotchPanel: NSPanel {
         }
     }
 
-    /// Hit target for hover open — wider than the visible pill so fast top-down
-    /// moves still register before the cursor leaves the strip.
+    /// Hit target for hover open / close.
+    ///
+    /// When **closed**, the trigger is the menu-bar strip across the pill's
+    /// horizontal range — moving the cursor to the top edge of the screen at
+    /// the notch fires immediately, while cursor positions below the menu bar
+    /// don't trigger. A small horizontal tolerance absorbs cursor jitter and
+    /// the cursor-skip across hardware notches.
+    ///
+    /// When **open**, the rect is the actual pill bounds, so leaving the pill
+    /// reliably closes it.
+    ///
+    /// During a **drag**, the rect is padded on all sides so the user can
+    /// throw the cursor toward the pill quickly.
     private func pillHoverHitRect() -> NSRect {
-        var rect = currentPillRect().insetBy(dx: -14, dy: -10)
-        rect.size.height += 22
-        rect.origin.y -= 22
-        return rect
+        let pillRect = currentPillRect()
+        let dragging = viewModel.tray.isDragInFlight || isDragOutInFlight
+        if dragging {
+            var rect = pillRect.insetBy(dx: -14, dy: -10)
+            rect.size.height += 22
+            rect.origin.y -= 22
+            return rect
+        }
+        if viewModel.notchState == .open {
+            return pillRect
+        }
+        // Closed: cover the menu-bar band so any cursor stop at the top edge
+        // in roughly the pill's horizontal range opens the pill.
+        let triggerHeight: CGFloat = max(pillRect.height, 36)
+        let triggerWidth  = pillRect.width + 12  // 6pt tolerance per side
+        let topY          = pillRect.maxY
+        return NSRect(
+            x:      pillRect.midX - triggerWidth / 2,
+            y:      topY - triggerHeight,
+            width:  triggerWidth,
+            height: triggerHeight
+        )
     }
 
     private func handlePillHoverChange(_ overPill: Bool) {
