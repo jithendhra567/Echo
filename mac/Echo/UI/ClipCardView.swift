@@ -42,7 +42,7 @@ struct ClipCardView: View {
     private var headerBar: some View {
         HStack(alignment: .center, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(clip.autoTag.cardLabel)
+                Text(headerLabel)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
                 Text(clip.createdAt.relativeFormatted)
@@ -64,15 +64,43 @@ struct ClipCardView: View {
         .animation(.easeInOut(duration: 0.25), value: headerColor)
     }
 
+    private var headerLabel: String {
+        clip.hexColor != nil ? "Color" : clip.autoTag.cardLabel
+    }
+
     // MARK: - Content preview
 
     @ViewBuilder
     private var contentPreview: some View {
-        switch clip.contentType {
-        case .image:              imageContent
-        case .richText:           richTextContent
-        case .plainText, .url:    textContent
+        if let hex = clip.hexColor {
+            colorContent(hex)
+        } else {
+            switch clip.contentType {
+            case .image:              imageContent
+            case .richText:           richTextContent
+            case .plainText, .url:    textContent
+            }
         }
+    }
+
+    /// Fills the card body with the actual hex color and centers the canonical
+    /// `#RRGGBB(AA)` form on top, choosing white or black text based on the
+    /// swatch's perceived brightness so the value stays readable.
+    private func colorContent(_ color: NSColor) -> some View {
+        let isLight = color.perceivedBrightness > 0.62
+        let displayText = clip.hexColorDisplayString ?? (clip.plainText ?? "")
+        return ZStack {
+            Color(nsColor: color)
+            Text(displayText)
+                .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                .foregroundStyle(isLight ? Color.black.opacity(0.78) : Color.white)
+                .shadow(color: isLight ? .white.opacity(0.25) : .black.opacity(0.30),
+                        radius: 1, x: 0, y: 0)
+                .padding(.horizontal, 10)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -202,6 +230,11 @@ struct ClipCardView: View {
     // MARK: - Header color
 
     private func resolvedHeaderColor() async -> Color {
+        if let hex = clip.hexColor {
+            // Darken the user's color so white tag/timestamp text stays legible
+            // on the header band, without straying too far from the actual hue.
+            return Color(nsColor: hex.darkenedForHeader())
+        }
         if let icon = clip.appIcon, let color = icon.averageColor {
             return Color(nsColor: color)
         }
@@ -273,6 +306,23 @@ extension NSImage {
         return NSColor(hue: h,
                        saturation: min(s * 1.25, 1.0),
                        brightness: min(bri, 0.55),
+                       alpha: 1)
+    }
+}
+
+// MARK: - Hex color → header band
+
+extension NSColor {
+    /// Pulls saturation and clamps brightness so the color works as a header
+    /// band behind white text — preserves the original hue but never goes so
+    /// bright that the "Color"/timestamp labels wash out.
+    func darkenedForHeader() -> NSColor {
+        let srgb = usingColorSpace(.sRGB) ?? self
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        srgb.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        return NSColor(hue: h,
+                       saturation: min(s * 1.1, 1.0),
+                       brightness: min(b, 0.55),
                        alpha: 1)
     }
 }

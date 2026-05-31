@@ -42,13 +42,20 @@ final class NotchViewModel {
     // MARK: - Active module priority
 
     /// Priority:
-    /// 1. Drag in progress → Tray (forced).
-    /// 2. First module whose `isActive == true` (tray with files / drop).
+    /// 1. Tray with queued files.
+    /// 2. Tray while a real file drag is over the open pill (drop targeted).
     /// 3. Clock — fallback. Reports `isActive == false`, so when nothing
     ///    else is active the pill stays as the bare notch (closed bar fades
     ///    out), and the clock surface only appears once the user hovers.
+    ///
+    /// `isDragInFlight` alone does **not** switch the module — that flag can
+    /// linger from a text selection or miss its mouse-up, which previously
+    /// surfaced the empty tray chrome in the closed pill.
     var activeModule: any NotchModule {
-        if tray.isDragInFlight {
+        if !tray.files.isEmpty {
+            return tray
+        }
+        if tray.isDragInFlight, notchState == .open || tray.isDropHighlighted {
             return tray
         }
         if let m = modules.first(where: { $0.isActive }) {

@@ -33,7 +33,10 @@ final class TrayModule: NotchModule {
 
     let supportsDrop = true
 
-    var isActive: Bool { isDragInFlight || !files.isEmpty }
+    /// True only when the tray has files to show. Drag-in-flight is tracked
+    /// separately (`isDragInFlight`) so a stale or false-positive drag flag
+    /// doesn't leave the empty drop-zone chrome stuck in the closed pill.
+    var isActive: Bool { !files.isEmpty }
 
     var files:             [TrayFile] = []
     var selectedIDs:       Set<UUID>  = []

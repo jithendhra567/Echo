@@ -154,10 +154,11 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         orderFrontRegardless()
         makeKeyAndOrderFront(nil)
 
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
-            viewModel.isVisible = true
-        }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+        // Single smooth scale + fade from the center of the island.
+        // `isExpanded` is flipped in the same transaction so the content reveal
+        // (gated on it via onChange) starts in lock-step with the open.
+        withAnimation(.spring(response: 0.44, dampingFraction: 0.86)) {
+            viewModel.isVisible  = true
             viewModel.isExpanded = true
         }
         setupKeyMonitor()
@@ -168,15 +169,15 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         isShowing = false
         tearDownKeyMonitor()
 
-        // Fade out and collapse simultaneously — no lingering pill visible.
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+        // Fade out and scale back to the center — mirrors the open animation.
+        withAnimation(.spring(response: 0.26, dampingFraction: 0.92)) {
             viewModel.isVisible  = false
             viewModel.isExpanded = false
         }
 
         hideTask?.cancel()
         hideTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(270))
+            try? await Task.sleep(for: .milliseconds(280))
             guard !Task.isCancelled else { return }
             self.ignoresMouseEvents = true
             self.orderOut(nil)
@@ -246,8 +247,8 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
             iw = size.width
             ih = size.height
         } else {
-            iw = viewModel.isExpanded ? DynamicIslandView.expandedWidth  : DynamicIslandView.pillWidth
-            ih = viewModel.isExpanded ? DynamicIslandView.expandedHeight : DynamicIslandView.pillHeight
+            iw = DynamicIslandView.expandedWidth
+            ih = DynamicIslandView.expandedHeight
         }
         let win = frame.size
         let ix = (win.width - iw) / 2

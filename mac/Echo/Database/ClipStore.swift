@@ -10,6 +10,9 @@ actor ClipStore {
     // access flows through the actor's serial executor.
     nonisolated(unsafe) private var db: OpaquePointer?
 
+    /// Unpinned clips older than this are removed automatically.
+    private static let retentionTTL: TimeInterval = 30 * 24 * 3600
+
     init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = support.appendingPathComponent("Echo")
@@ -57,24 +60,37 @@ actor ClipStore {
             sqlite3_bind_double(stmt, 8, clip.createdAt.timeIntervalSince1970)
             sqlite3_bind_int(stmt, 9, clip.isPinned ? 1 : 0)
         }
+        prune()
     }
 
-    func fetchRecent(limit: Int = 50) -> [Clip] {
+    func fetchRecent() -> [Clip] {
+        prune()
         guard let db else { return [] }
+        let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
         let sql = """
             SELECT id, content_data, content_type, source_app_bundle,
                    source_app_name, window_title, created_at, is_pinned
-            FROM clips ORDER BY is_pinned DESC, created_at DESC LIMIT ?;
+            FROM clips
+            WHERE is_pinned = 1 OR created_at >= ?
+            ORDER BY is_pinned DESC, created_at DESC;
         """
         var clips: [Clip] = []
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int(stmt, 1, Int32(limit))
+        sqlite3_bind_double(stmt, 1, cutoff)
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let clip = parseRow(stmt) { clips.append(clip) }
         }
         return clips
+    }
+
+    func prune() {
+        guard let db else { return }
+        let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
+        prepare(db: db, sql: "DELETE FROM clips WHERE is_pinned = 0 AND created_at < ?;") { stmt in
+            sqlite3_bind_double(stmt, 1, cutoff)
+        }
     }
 
     func delete(id: UUID) {

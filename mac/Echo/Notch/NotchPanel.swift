@@ -33,7 +33,14 @@ final class NotchPanel: NSPanel {
     nonisolated(unsafe) private var openHoverTask:  Task<Void, Never>?
     nonisolated(unsafe) private var closeHoverTask: Task<Void, Never>?
 
-    private static let hoverDebounce = Duration.milliseconds(50)
+    private static let hoverDebounce = Duration.milliseconds(20)
+    /// Extra pixels added to the top of every hover hit-rect so the cursor at
+    /// the very top edge of the screen (windowPt.y == winH) still counts as
+    /// "inside" — `NSRect.contains` treats the high y edge as exclusive.
+    /// Without this slack on the OPEN rect the user sees a flicker/bounce:
+    /// open → cursor at maxY is "outside" → close → cursor at maxY is "inside"
+    /// the closed-band rect (which already has slack) → open → repeat.
+    private static let edgeTopSlack: CGFloat = 6
 
     init(layoutGuide: NotchLayoutGuide) {
         self.layoutGuide = layoutGuide
@@ -166,6 +173,13 @@ final class NotchPanel: NSPanel {
         let screenPt = NSEvent.mouseLocation
         let windowPt = convertPoint(fromScreen: screenPt)
 
+        // If the drag flag is set but no button is held, the global mouse-up
+        // monitor missed the release — clear it so the empty tray chrome
+        // doesn't linger in the closed pill.
+        if viewModel.tray.isDragInFlight, NSEvent.pressedMouseButtons == 0 {
+            viewModel.tray.dragEnded()
+        }
+
         let pillRect = pillHoverHitRect()
         let overPill = pillRect.contains(windowPt)
 
@@ -209,25 +223,30 @@ final class NotchPanel: NSPanel {
     private func pillHoverHitRect() -> NSRect {
         let pillRect = currentPillRect()
         let dragging = viewModel.tray.isDragInFlight || isDragOutInFlight
+        let topSlack = Self.edgeTopSlack
         if dragging {
             var rect = pillRect.insetBy(dx: -14, dy: -10)
-            rect.size.height += 22
+            rect.size.height += 22 + topSlack
             rect.origin.y -= 22
             return rect
         }
         if viewModel.notchState == .open {
-            return pillRect
+            // Same screen-edge slack as the closed band so the cursor sitting
+            // exactly at screen.maxY doesn't fall on the excluded top boundary
+            // of the open pill rect and trigger a stray close.
+            var rect = pillRect
+            rect.size.height += topSlack
+            return rect
         }
         // Closed: cover the menu-bar band so any cursor stop at the top edge
         // in roughly the pill's horizontal range opens the pill.
-        let triggerHeight: CGFloat = max(pillRect.height, 36)
-        let triggerWidth  = pillRect.width + 12  // 6pt tolerance per side
-        let topY          = pillRect.maxY
+        let bandHeight: CGFloat = max(pillRect.height, 40)
+        let triggerWidth  = pillRect.width + 16  // 8pt tolerance per side
         return NSRect(
             x:      pillRect.midX - triggerWidth / 2,
-            y:      topY - triggerHeight,
+            y:      pillRect.maxY - bandHeight,
             width:  triggerWidth,
-            height: triggerHeight
+            height: bandHeight + topSlack
         )
     }
 

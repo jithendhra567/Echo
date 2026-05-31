@@ -4,8 +4,6 @@ import AppKit
 // MARK: - Dimension constants (shared with DynamicIslandWindow for hit-test math)
 
 extension DynamicIslandView {
-    static let pillWidth:    CGFloat = 120
-    static let pillHeight:   CGFloat = 34
     static let expandedWidth:  CGFloat = 720
     static let expandedHeight: CGFloat = 440
     static let instantSearchScreenFraction: CGFloat = 0.70
@@ -34,34 +32,36 @@ struct DynamicIslandView: View {
 
     private static let launcherSpring = Animation.spring(response: 0.34, dampingFraction: 0.78)
     private static let launcherSpringBouncy = Animation.spring(response: 0.34, dampingFraction: 0.72)
+    /// The single smooth spring used for the open/close animation.
+    /// Slightly slower + well-damped so the panel feels weighty rather than poppy.
+    private static let openSpring = Animation.spring(response: 0.44, dampingFraction: 0.86)
 
     private var cr: CGFloat {
-        if vm.isInstantSearchOpen { return 20 }
-        return vm.isExpanded ? 24 : 17
+        vm.isInstantSearchOpen ? 20 : 24
     }
 
     private func islandW(_ geo: GeometryProxy) -> CGFloat {
         if vm.isInstantSearchOpen {
             return Self.instantSearchSize(for: NSScreen.main).width
         }
-        return vm.isExpanded ? Self.expandedWidth : Self.pillWidth
+        return Self.expandedWidth
     }
     private func islandH(_ geo: GeometryProxy) -> CGFloat {
         if vm.isInstantSearchOpen {
             return Self.instantSearchSize(for: NSScreen.main).height
         }
-        return vm.isExpanded ? Self.expandedHeight : Self.pillHeight
+        return Self.expandedHeight
     }
 
     private var islandScale: CGFloat {
-        guard vm.isVisible else { return 0.85 }
+        guard vm.isVisible else { return 0.94 }
         if vm.isInstantSearchOpen { return instantSearchScale }
         return 1.0
     }
 
-    private var islandScaleAnchor: UnitPoint {
-        vm.isInstantSearchOpen ? .center : .top
-    }
+    /// Always scale from the geometric center of the island so the open
+    /// animation grows uniformly outward instead of unfurling from the top.
+    private var islandScaleAnchor: UnitPoint { .center }
 
     var body: some View {
         GeometryReader { geo in
@@ -127,8 +127,7 @@ struct DynamicIslandView: View {
         .scaleEffect(islandScale, anchor: islandScaleAnchor)
         .opacity(vm.isVisible ? 1.0 : 0)
         .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
-        .animation(Self.launcherSpring, value: vm.isExpanded)
-        .animation(.spring(response: 0.22, dampingFraction: 0.82), value: vm.isVisible)
+        .animation(Self.openSpring, value: vm.isVisible)
     }
 
     // MARK: - Background
@@ -153,12 +152,6 @@ struct DynamicIslandView: View {
             .shadow(color: .black.opacity(0.28), radius: 18, y: 6)
             .shadow(color: .black.opacity(0.10), radius: 80, y: 32)
             .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
-            .animation(
-                vm.isExpanded
-                    ? Self.launcherSpring
-                    : .spring(response: 0.24, dampingFraction: 0.88),
-                value: vm.isExpanded
-            )
     }
 
     // MARK: - Expanded content
@@ -852,7 +845,10 @@ private struct ClipResultRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            if let appIcon = cachedAppIcon {
+            if let hex = clip.hexColor {
+                HexColorSwatch(color: hex)
+                    .frame(width: 22, height: 22)
+            } else if let appIcon = cachedAppIcon {
                 Image(nsImage: appIcon)
                     .resizable()
                     .frame(width: 22, height: 22)
@@ -868,6 +864,13 @@ private struct ClipResultRow: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.green.opacity(0.85))
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            } else if clip.hexColor != nil {
+                Text(previewText)
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(1)
+                    .transition(.opacity)
             } else {
                 Text(previewText)
                     .font(.system(size: 13))
@@ -906,6 +909,27 @@ private struct ClipResultRow: View {
         case .url:       return "link"
         case .image:     return "photo.fill"
         }
+    }
+}
+
+// MARK: - Hex color swatch
+
+/// Small filled square that previews a hex-color clip. A subtle hairline border
+/// keeps very light or very dark swatches readable against the launcher background.
+struct HexColorSwatch: View {
+    let color: NSColor
+
+    var body: some View {
+        let isLight = color.perceivedBrightness > 0.78
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .fill(Color(nsColor: color))
+            .overlay {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(
+                        Color.white.opacity(isLight ? 0.22 : 0.18),
+                        lineWidth: 0.6
+                    )
+            }
     }
 }
 

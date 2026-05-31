@@ -117,6 +117,72 @@ extension Clip {
     }
 }
 
+// MARK: - Hex color detection
+
+extension Clip {
+    /// Returns the parsed color when the trimmed plain-text payload is a
+    /// CSS-style hex literal. Accepts `RRGGBB` / `RRGGBBAA` with or without
+    /// a leading `#`, and `RGB` only when prefixed with `#` (bare three-letter
+    /// sequences false-positive on too many English words like "fee" or "abc").
+    var hexColor: NSColor? {
+        guard let raw = resolvedPlainText else { return nil }
+        return NSColor.parsingHex(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Canonical `#RRGGBB(AA)` form for display, regardless of the user's input
+    /// casing or whether they included the `#`.
+    var hexColorDisplayString: String? {
+        guard let color = hexColor else { return nil }
+        let srgb = color.usingColorSpace(.sRGB) ?? color
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        srgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let ri = Int(round(r * 255)), gi = Int(round(g * 255)), bi = Int(round(b * 255))
+        if a >= 0.999 {
+            return String(format: "#%02X%02X%02X", ri, gi, bi)
+        }
+        let ai = Int(round(a * 255))
+        return String(format: "#%02X%02X%02X%02X", ri, gi, bi, ai)
+    }
+}
+
+extension NSColor {
+    /// Parse a CSS-style hex string into an sRGB color. Returns nil unless the
+    /// *entire* input is a valid hex literal.
+    static func parsingHex(_ string: String) -> NSColor? {
+        let hasPrefix = string.hasPrefix("#")
+        var hex = string
+        if hasPrefix { hex.removeFirst() }
+        let chars = Array(hex)
+        guard !chars.isEmpty, chars.allSatisfy({ $0.isHexDigit }) else { return nil }
+        let expanded: String
+        switch chars.count {
+        case 3 where hasPrefix:
+            expanded = chars.map { "\($0)\($0)" }.joined() + "ff"
+        case 6:
+            expanded = String(chars) + "ff"
+        case 8:
+            expanded = String(chars)
+        default:
+            return nil
+        }
+        guard let value = UInt32(expanded, radix: 16) else { return nil }
+        let r = CGFloat((value >> 24) & 0xff) / 255
+        let g = CGFloat((value >> 16) & 0xff) / 255
+        let b = CGFloat((value >>  8) & 0xff) / 255
+        let a = CGFloat( value        & 0xff) / 255
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    /// Rec. 601 luma — used to decide whether a color reads better with white
+    /// or black text on top. Returns 0…1.
+    var perceivedBrightness: CGFloat {
+        let srgb = usingColorSpace(.sRGB) ?? self
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        srgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    }
+}
+
 // MARK: - Date helper
 
 extension Date {

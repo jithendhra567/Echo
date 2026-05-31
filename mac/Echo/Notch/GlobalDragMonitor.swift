@@ -17,6 +17,9 @@ final class GlobalDragMonitor {
     private var mouseDownMonitor:    Any?
     private var mouseDraggedMonitor: Any?
     private var mouseUpMonitor:      Any?
+    /// Local backup — the global mouse-up monitor can miss releases that
+    /// happen while our panel briefly accepts events during a drag.
+    private var localMouseUpMonitor: Any?
 
     private var pasteboardChangeCount = -1
     private var isMouseDown      = false
@@ -53,36 +56,50 @@ final class GlobalDragMonitor {
         }
 
         mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
-            guard let self else { return }
-            let wasDragging = self.isContentDragging
-            self.isMouseDown      = false
-            self.isContentDragging = false
-            self.pasteboardChangeCount = -1
-            if wasDragging { self.onDragEnded?() }
+            self?.finishDragSession()
+        }
+
+        localMouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            self?.finishDragSession()
+            return event
         }
     }
 
     func stop() {
-        [mouseDownMonitor, mouseDraggedMonitor, mouseUpMonitor]
+        [mouseDownMonitor, mouseDraggedMonitor, mouseUpMonitor, localMouseUpMonitor]
             .compactMap { $0 }
             .forEach { NSEvent.removeMonitor($0) }
         mouseDownMonitor    = nil
         mouseDraggedMonitor = nil
         mouseUpMonitor      = nil
+        localMouseUpMonitor = nil
         isMouseDown         = false
         isContentDragging   = false
+    }
+
+    private func finishDragSession() {
+        let wasDragging = isContentDragging
+        isMouseDown       = false
+        isContentDragging = false
+        pasteboardChangeCount = -1
+        if wasDragging { onDragEnded?() }
     }
 
     // No deinit cleanup needed — the monitor lives for the app's lifetime.
     // Call `stop()` explicitly if you ever need to tear it down.
 
-    /// File URL, generic URL, or any string-like content — covers Finder,
-    /// browsers, photos, file-promise APIs.
+    /// File and image payloads only. Plain `.string` drags (text selections,
+    /// links copied as text) must not activate the tray — they were the main
+    /// source of false-positive `isDragInFlight` flags.
     private func hasValidDragContent() -> Bool {
         let valid: [NSPasteboard.PasteboardType] = [
             .fileURL,
-            NSPasteboard.PasteboardType(UTType.url.identifier),
-            .string
+            NSPasteboard.PasteboardType(UTType.png.identifier),
+            NSPasteboard.PasteboardType(UTType.tiff.identifier),
+            NSPasteboard.PasteboardType(UTType.jpeg.identifier),
+            NSPasteboard.PasteboardType(UTType.heic.identifier),
+            NSPasteboard.PasteboardType(UTType.gif.identifier),
+            NSPasteboard.PasteboardType(UTType.image.identifier),
         ]
         return dragPasteboard.types?.contains(where: valid.contains) ?? false
     }
