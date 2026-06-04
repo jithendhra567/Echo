@@ -42,6 +42,8 @@ Echo/
 │   ├── DynamicIslandWindow.swift  # Transparent NSPanel; morphs in SwiftUI; keyboard nav
 │   ├── LauncherViewModel.swift    # Orchestrates apps + tabs + utility + instant-search results
 │   ├── AppSearchEngine.swift      # Indexes installed apps; usage-frequency ranking
+│   ├── AppWindowEngine.swift      # AX window enumerate / search / focus (requires Accessibility)
+│   ├── AppWindow.swift            # Open window result model
 │   ├── HotkeyManager.swift        # Carbon hotkey registration
 │   ├── LauncherSettings.swift     # UserDefaults-backed hotkey persistence; onChange callbacks
 │   ├── AppInfo.swift              # App metadata struct
@@ -113,6 +115,7 @@ NSPasteboard ──poll 500ms──▶ ClipboardMonitor ──save──▶ Clip
                                                    │
                                             LauncherViewModel
                                             ├── AppSearchEngine
+                                            ├── AppWindowEngine (AX — open window titles)
                                             ├── BrowserTabEngine ──▶ BrowserTabStore
                                             ├── UtilityParser / CurrencyConversionService (inline results)
                                             └── InstantSearchSession (WKWebView, prefetched)
@@ -149,11 +152,11 @@ NSWorkspace.didActivateApplication ──▶ LauncherViewModel.recordSystemActiv
 
 ### Permissions
 
-The app requests Accessibility access on first launch. Without it:
-- `AppMetadataCapture` returns `nil` for `windowTitle`
-- `NSEvent.addGlobalMonitorForEvents` receives no events
+**Accessibility** is requested when the launcher opens (`LauncherViewModel.expand()`). Required for:
+- `AppWindowEngine` — enumerate and focus open app windows by title in the launcher
+- `AppMetadataCapture` — record the frontmost window title when copying to clipboard
 
-The global hotkeys and Escape-to-close both rely on this permission.
+Without Accessibility, window search is hidden and clipboard clips omit `windowTitle`.
 
 **Camera** is requested lazily when `NotchMirrorCapture.startIfNeeded()` is called (from `ClockModule`). The capture session runs on a dedicated `DispatchQueue` (`com.echo.notch.mirror.session`); the `AVCaptureVideoPreviewLayer` is hosted in `NotchMirrorCameraPreview` (`NSViewRepresentable`).
 

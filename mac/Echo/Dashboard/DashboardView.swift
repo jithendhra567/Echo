@@ -127,11 +127,40 @@ struct LauncherSettingsPane: View {
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
+                        Text("Window Search")
+                            .font(.headline)
+
+                        if AccessibilityPermission.isGranted {
+                            Label("Accessibility enabled", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Search open app windows by title — e.g. type a project name to switch between multiple Cursor windows.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            Text("Enable Accessibility to search and switch between open app windows by title. Window titles are also recorded when you copy to the clipboard.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                Button("Request Permission…") {
+                                    AccessibilityPermission.requestIfNeeded()
+                                }
+                                Button("Open System Settings…") {
+                                    AccessibilityPermission.openSystemSettings()
+                                }
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Usage Tips")
                             .font(.headline)
                         tip(icon: "keyboard", text: "Press your hotkey to open the launcher")
                         tip(icon: "arrow.up.arrow.down", text: "Use ↑↓ to navigate results")
                         tip(icon: "return", text: "Press Return to launch the selected app")
+                        tip(icon: "macwindow", text: "Type a window or project name to switch between open app windows")
                         tip(icon: "escape", text: "Press Escape to dismiss without launching")
                     }
                     .padding(8)

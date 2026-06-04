@@ -7,6 +7,8 @@ final class LauncherViewModel {
     var searchQuery: String = ""
     var results: [AppInfo] = []
     var tabResults: [BrowserTab] = []
+    var windowResults: [AppWindow] = []
+    var isLoadingWindows: Bool = false
     var selectedIndex: Int = 0
     var clipSelectedIndex: Int = 0
     var activePanel: ActivePanel = .apps
@@ -35,13 +37,23 @@ final class LauncherViewModel {
 
     var clipVM: ClipViewModel?
 
-    private let engine    = AppSearchEngine()
-    private let tabEngine = BrowserTabEngine()
-    private let tabStore  = BrowserTabStore()
+    private let engine        = AppSearchEngine()
+    private let tabEngine     = BrowserTabEngine()
+    private let windowEngine  = AppWindowEngine()
+    private let tabStore      = BrowserTabStore()
 
     private var cachedAllTabs: [BrowserTab] = []
+    private var cachedAllWindows: [AppWindow] = []
     private var tabPollerTask: Task<Void, Never>?
+    private var windowFetchTask: Task<Void, Never>?
+    private var expandSessionID = UUID()
+    private var launcherOpenedAt: Date?
     private var appIndexWatcher: AppIndexWatcher?
+
+    private static let windowFetchDebounceMs: UInt64 = 280
+    /// Wait for open animation before any AX / window work.
+    private static let windowFetchAfterOpenMs: UInt64 = 700
+    private static let tabPollDelayMs: UInt64 = 2_500
 
     enum ActivePanel { case apps, clipboard }
 
@@ -58,11 +70,68 @@ final class LauncherViewModel {
         if clip.plainText?.lowercased().contains(query) == true { return true }
         if clip.attributedString?.string.lowercased().contains(query) == true { return true }
         if clip.sourceAppName?.lowercased().contains(query) == true { return true }
+        if clip.windowTitle?.lowercased().contains(query) == true { return true }
         return false
     }
 
+    var canSearchWindows: Bool { AccessibilityPermission.isGranted }
+
     var showsGoogleFallback: Bool {
-        !searchQuery.isEmpty && results.isEmpty && tabResults.isEmpty
+        !searchQuery.isEmpty && results.isEmpty && windowResults.isEmpty && tabResults.isEmpty && !isLoadingWindows
+    }
+
+    /// Apps interleaved with open windows; title-only matches appear as standalone rows with app icons.
+    var appsListItems: [LauncherAppsListItem] {
+        guard !showsGoogleFallback else { return [] }
+        let query = AppWindowEngine.normalizedQuery(searchQuery)
+        var items: [LauncherAppsListItem] = []
+        var shownWindowIDs = Set<UUID>()
+
+        for (index, app) in results.enumerated() {
+            items.append(.app(app))
+            let appWindows = windows(for: app)
+            if index == 0, isLoadingWindows, appWindows.isEmpty {
+                items.append(.windowsLoading(appID: app.id))
+            }
+            if appWindows.count > 1 {
+                for window in appWindows {
+                    items.append(.window(window, nested: true))
+                    shownWindowIDs.insert(window.id)
+                }
+            } else {
+                for window in appWindows {
+                    shownWindowIDs.insert(window.id)
+                }
+            }
+        }
+
+        if !query.isEmpty {
+            for window in windowResults where !shownWindowIDs.contains(window.id) {
+                guard AppWindowEngine.normalizedQuery(window.title).contains(query) else { continue }
+                items.append(.window(window, nested: false))
+                shownWindowIDs.insert(window.id)
+            }
+        }
+
+        if isLoadingWindows, items.isEmpty, !query.isEmpty {
+            items.append(.windowsLoading(appID: UUID()))
+        }
+
+        return items
+    }
+
+    func windows(for app: AppInfo) -> [AppWindow] {
+        let bundleID = app.bundleIdentifier
+        let normalizedName = AppWindowEngine.normalizedQuery(app.name)
+        return windowResults.filter { window in
+            if let bundleID, let windowBundle = window.bundleIdentifier, bundleID == windowBundle {
+                return true
+            }
+            let windowName = AppWindowEngine.normalizedQuery(window.appName)
+            return windowName == normalizedName
+                || windowName.contains(normalizedName)
+                || normalizedName.contains(windowName)
+        }
     }
 
     var showsInstantSearchRow: Bool { showsGoogleFallback }
@@ -92,7 +161,7 @@ final class LauncherViewModel {
 
     var combinedCount: Int {
         utilityRowCount
-            + (showsGoogleFallback ? webFallbackRowCount : results.count)
+            + (showsGoogleFallback ? webFallbackRowCount : appsListItems.count)
             + tabResults.count
     }
 
@@ -114,11 +183,15 @@ final class LauncherViewModel {
         selectedIndex     = 0
         clipSelectedIndex = 0
         resolveUtility()
+        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+        if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            scheduleTabPollerIfNeeded()
+        }
         Task {
             results = await engine.search(query: searchQuery)
             instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+            scheduleWindowFetch()
         }
-        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
         if let url = instantSearchTargetURL {
             if isInstantSearchOpen {
                 instantSearchSession.load(url)
@@ -206,6 +279,124 @@ final class LauncherViewModel {
 
         cachedAllTabs = activeTabs + savedOnly
         tabResults    = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+    }
+
+    private func scheduleWindowFetch() {
+        windowFetchTask?.cancel()
+        let query = searchQuery
+        let sessionID = expandSessionID
+
+        guard canSearchWindows else {
+            isLoadingWindows = false
+            windowResults = []
+            cachedAllWindows = []
+            return
+        }
+
+        if results.isEmpty, query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            isLoadingWindows = false
+            return
+        }
+
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            windowResults = []
+        }
+        windowFetchTask = Task {
+            let openedRecently = launcherOpenedAt.map { Date().timeIntervalSince($0) < 0.8 } ?? false
+            if openedRecently {
+                try? await Task.sleep(for: .milliseconds(Self.windowFetchAfterOpenMs))
+            }
+            guard !Task.isCancelled, sessionID == expandSessionID, query == searchQuery else { return }
+            let debounceMs = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? 0
+                : Self.windowFetchDebounceMs
+            if debounceMs > 0 {
+                try? await Task.sleep(for: .milliseconds(debounceMs))
+            }
+            guard !Task.isCancelled, sessionID == expandSessionID, query == searchQuery else { return }
+            isLoadingWindows = true
+            await fetchWindowsForQuery(query)
+        }
+    }
+
+    private func fetchWindowsForQuery(_ query: String) async {
+        defer {
+            if query == searchQuery {
+                isLoadingWindows = false
+            }
+        }
+        guard canSearchWindows, query == searchQuery, !Task.isCancelled else { return }
+
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let appResults = trimmed.isEmpty ? results : await engine.search(query: query)
+        if !trimmed.isEmpty {
+            guard query == searchQuery, !Task.isCancelled else { return }
+            results = appResults
+        }
+
+        let bundleIDs = Set(appResults.compactMap(\.bundleIdentifier))
+        let appNames = Set(appResults.map(\.name))
+
+        let targets: [RunningAppSnapshot]
+        if trimmed.isEmpty, let first = appResults.first {
+            targets = AppWindowEngine.runningApps(for: first)
+        } else {
+            var matched = AppWindowEngine.runningApps(
+                matching: query,
+                bundleIDs: bundleIDs,
+                appNames: appNames
+            )
+            if matched.isEmpty {
+                matched = appResults.flatMap { AppWindowEngine.runningApps(for: $0) }
+            }
+            targets = matched
+        }
+
+        let windows: [AppWindow]
+        if trimmed.isEmpty {
+            if targets.isEmpty {
+                windows = []
+            } else {
+                windows = await windowEngine.fetchWindows(runningApps: targets)
+            }
+        } else {
+            let allRunning = AppWindowEngine.snapshotRunningApps()
+            async let appWindows: [AppWindow] = targets.isEmpty
+                ? []
+                : windowEngine.fetchWindows(runningApps: targets)
+            async let titleWindows: [AppWindow] = windowEngine.fetchWindowsMatchingTitle(
+                query,
+                runningApps: allRunning
+            )
+            windows = AppWindowEngine.merged(await appWindows, await titleWindows)
+        }
+        guard query == searchQuery, !Task.isCancelled else { return }
+
+        cachedAllWindows = windows
+        if trimmed.isEmpty {
+            windowResults = windows
+        } else {
+            windowResults = windowEngine.search(
+                query: query,
+                in: windows,
+                bundleIDs: bundleIDs,
+                appNames: appNames
+            )
+        }
+    }
+
+    private func scheduleTabPollerIfNeeded() {
+        guard tabPollerTask == nil else { return }
+        tabPollerTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(Self.tabPollDelayMs))
+            guard !Task.isCancelled else { return }
+            await self?.refreshTabs()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
+                await self?.refreshTabs()
+            }
+        }
     }
 
     // MARK: - Panel switching
@@ -311,18 +502,23 @@ final class LauncherViewModel {
                 return
             }
             let contentIndex = selectedIndex - utilityRowCount
-            let appCount = showsGoogleFallback ? webFallbackRowCount : results.count
-            if contentIndex < appCount {
-                if showsGoogleFallback {
-                    confirmInstantSearchSelection(at: contentIndex)
-                    return
-                }
-                guard results.indices.contains(contentIndex) else { return }
-                launchApp(results[contentIndex])
-            } else {
-                let tabIdx = contentIndex - appCount
+            if showsGoogleFallback {
+                confirmInstantSearchSelection(at: contentIndex)
+                return
+            }
+            guard contentIndex < appsListItems.count else {
+                let tabIdx = contentIndex - appsListItems.count
                 guard tabResults.indices.contains(tabIdx) else { return }
                 openTab(tabResults[tabIdx])
+                return
+            }
+            switch appsListItems[contentIndex] {
+            case .app(let app):
+                launchApp(app)
+            case .window(let window, _):
+                focusWindow(window)
+            case .windowsLoading:
+                break
             }
         case .clipboard:
             let clips = filteredClips
@@ -413,39 +609,64 @@ final class LauncherViewModel {
         onLaunch?()
     }
 
+    func focusWindow(_ window: AppWindow) {
+        Task { await windowEngine.focusWindow(window) }
+        onLaunch?()
+    }
+
     func dismiss() { onDismiss?() }
 
     func expand() {
-        Task { await reindexApps() }
+        expandSessionID = UUID()
+        launcherOpenedAt = Date()
         tabPollerTask?.cancel()
-        tabPollerTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refreshTabs()
-                try? await Task.sleep(for: .seconds(3))
+        tabPollerTask = nil
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(Self.windowFetchAfterOpenMs))
+            guard isExpanded, isVisible else { return }
+            if results.isEmpty {
+                results = await engine.search(query: "")
             }
+            scheduleWindowFetch()
         }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            AccessibilityPermission.requestIfNeeded()
+        }
+    }
+
+    /// Light reset when opening — keeps cached app list so the panel appears instantly.
+    func prepareForShow() {
+        utilityResolveTask?.cancel()
+        utilityResolveTask = nil
+        utilityResult = nil
+        utilityIsLoading = false
+        utilityError = nil
+        windowFetchTask?.cancel()
+        windowFetchTask = nil
+        isLoadingWindows = false
+        searchQuery = ""
+        selectedIndex = 0
+        clipSelectedIndex = 0
+        activePanel = .apps
+        copiedClipID = nil
+        launchingAppID = nil
+        ignoreHover = true
+        isInstantSearchOpen = false
+        instantSearchSession.reset()
+        onInstantSearchChanged?(false)
     }
 
     func reset() {
         tabPollerTask?.cancel()
-        tabPollerTask     = nil
-        searchQuery       = ""
-        selectedIndex     = 0
-        clipSelectedIndex = 0
-        activePanel       = .apps
-        isVisible         = false
-        isExpanded        = false
-        copiedClipID          = nil
-        launchingAppID        = nil
-        utilityResolveTask?.cancel()
-        utilityResolveTask    = nil
-        utilityResult         = nil
-        utilityIsLoading      = false
-        utilityError          = nil
-        ignoreHover           = true
-        isInstantSearchOpen   = false
-        instantSearchSession.reset()
-        onInstantSearchChanged?(false)
+        tabPollerTask = nil
+        launcherOpenedAt = nil
+        windowResults = []
+        cachedAllWindows = []
+        prepareForShow()
+        isVisible = false
+        isExpanded = false
         Task {
             await refreshDefaults()
             instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)

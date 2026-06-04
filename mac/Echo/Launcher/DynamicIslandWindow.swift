@@ -143,8 +143,12 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
         previousApp = NSWorkspace.shared.frontmostApplication
         isShowing   = true
-        viewModel.reset()          // resets isVisible=false, isExpanded=false
-        clipViewModel.loadClips()  // refresh clipboard history
+        viewModel.prepareForShow()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard let self, self.isShowing else { return }
+            self.clipViewModel.loadClips()
+        }
         reposition()
         ignoresMouseEvents = false
         acceptsMouseMovedEvents = true   // needed to detect first move for hover-guard

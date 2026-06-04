@@ -12,7 +12,7 @@ enum AppMetadataCapture {
         return AppMetadata(
             bundleIdentifier: app?.bundleIdentifier,
             localizedName: app?.localizedName,
-            windowTitle: nil
+            windowTitle: AppWindowEngine.frontmostWindowTitle(for: app)
         )
     }
 }

@@ -75,13 +75,10 @@ struct DynamicIslandView: View {
         .onChange(of: vm.isExpanded) { _, expanded in
             if expanded {
                 vm.expand()
+                showContent = true
+                isSearchFocused = true
                 Task {
-                    try? await Task.sleep(for: .milliseconds(50))
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.84)) {
-                        showContent = true
-                    }
-                    isSearchFocused = true
-                    try? await Task.sleep(for: .milliseconds(350))
+                    try? await Task.sleep(for: .milliseconds(400))
                     withAnimation(.easeIn(duration: 0.25)) { showTimestamps = true }
                 }
             } else {
@@ -270,7 +267,7 @@ struct DynamicIslandView: View {
         return VStack(spacing: 0) {
             sectionLabel("APPS", active: vm.activePanel == .apps)
 
-            if vm.results.isEmpty && vm.tabResults.isEmpty && !vm.showsUtilityRow {
+            if vm.appsListItems.isEmpty && vm.tabResults.isEmpty && !vm.isLoadingWindows && !vm.showsUtilityRow {
                 if vm.showsGoogleFallback {
                     VStack(spacing: 1) {
                         fallbackRows(baseOffset: calcOffset)
@@ -304,17 +301,32 @@ struct DynamicIslandView: View {
                             .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = 0 } }
                         }
 
-                        if vm.results.isEmpty && vm.tabResults.isEmpty && vm.showsGoogleFallback {
+                        if vm.appsListItems.isEmpty && vm.tabResults.isEmpty && !vm.isLoadingWindows && vm.showsGoogleFallback {
                             fallbackRows(baseOffset: calcOffset)
                         }
 
-                        ForEach(Array(vm.results.enumerated()), id: \.element.id) { idx, app in
+                        ForEach(Array(vm.appsListItems.enumerated()), id: \.element.id) { idx, item in
                             let globalIdx = calcOffset + idx
-                            AppResultRow(
-                                app: app,
-                                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
-                                isLaunching: vm.launchingAppID == app.id
-                            )
+                            Group {
+                                switch item {
+                                case .app(let app):
+                                    AppResultRow(
+                                        app: app,
+                                        isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                                        isLaunching: vm.launchingAppID == app.id
+                                    )
+                                    .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
+                                case .window(let window, let nested):
+                                    AppWindowResultRow(
+                                        window: window,
+                                        nested: nested,
+                                        isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
+                                    )
+                                    .onTapGesture { vm.selectedIndex = globalIdx; vm.focusWindow(window) }
+                                case .windowsLoading:
+                                    WindowResultsLoadingRow(nested: true)
+                                }
+                            }
                             .opacity(showContent ? 1 : 0)
                             .offset(y: showContent ? 0 : -6)
                             .animation(
@@ -322,7 +334,6 @@ struct DynamicIslandView: View {
                                     .delay(Double(globalIdx) * 0.016),
                                 value: showContent
                             )
-                            .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
                             .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
                         }
 
@@ -330,9 +341,9 @@ struct DynamicIslandView: View {
                             appsSectionDivider("TABS")
                                 .padding(.top, 4)
 
-                            let appCount = vm.showsGoogleFallback ? vm.webFallbackRowCount : vm.results.count
+                            let appsListCount = vm.showsGoogleFallback ? vm.webFallbackRowCount : vm.appsListItems.count
                             ForEach(Array(vm.tabResults.enumerated()), id: \.element.id) { idx, tab in
-                                let globalIdx = calcOffset + appCount + idx
+                                let globalIdx = calcOffset + appsListCount + idx
                                 BrowserTabResultRow(
                                     tab: tab,
                                     isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
@@ -489,6 +500,97 @@ struct DynamicIslandView: View {
             .foregroundStyle(.white.opacity(0.28))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.vertical, 24)
+    }
+}
+
+// MARK: - Window results loading row
+
+private struct WindowResultsLoadingRow: View {
+    var nested: Bool = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if nested {
+                Color.clear.frame(width: 20)
+            }
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white.opacity(0.55))
+            Text("Loading windows…")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.40))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, nested ? 5 : 10)
+    }
+}
+
+// MARK: - App window result row
+
+private struct AppWindowResultRow: View {
+    let window: AppWindow
+    var nested: Bool = false
+    let isSelected: Bool
+
+    private static var iconCache: [String: NSImage] = [:]
+
+    private var appIcon: NSImage {
+        if let bid = window.bundleIdentifier, let hit = Self.iconCache[bid] { return hit }
+        if let bid = window.bundleIdentifier,
+           let url = NSWorkspace.shared.urlsForApplications(withBundleIdentifier: bid).first {
+            let img = NSWorkspace.shared.icon(forFile: url.path)
+            Self.iconCache[bid] = img
+            return img
+        }
+        if let running = NSRunningApplication(processIdentifier: window.processID) {
+            return running.icon ?? NSImage(named: NSImage.applicationIconName)!
+        }
+        return NSImage(named: NSImage.applicationIconName)
+            ?? NSWorkspace.shared.icon(forFile: "/System/Applications")
+    }
+
+    var body: some View {
+        HStack(spacing: 9) {
+            if nested {
+                Color.clear.frame(width: 20)
+            }
+
+            Image(nsImage: appIcon)
+                .resizable()
+                .frame(width: nested ? 22 : 26, height: nested ? 22 : 26)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(window.title)
+                    .font(.system(size: nested ? 12 : 13, weight: isSelected ? .medium : .regular))
+                    .lineLimit(1)
+                if !nested {
+                    Text(window.appName)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.38))
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if isSelected {
+                Image(systemName: "return")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.40))
+                    .transition(.opacity.combined(with: .scale(scale: 0.7)))
+            }
+        }
+        .foregroundColor(isSelected ? .white : .white.opacity(nested ? 0.72 : 0.82))
+        .padding(.horizontal, 9)
+        .padding(.vertical, nested ? 5 : 7)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.white.opacity(0.10) : Color.clear)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected)
     }
 }
 
