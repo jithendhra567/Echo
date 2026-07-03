@@ -184,24 +184,21 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         guard isShowing else { return }
         isShowing = false
         tearDownKeyMonitor()
-
-        // Fade out and scale back to the center — mirrors the open animation.
         suppressDismissUntil = nil
-        var transaction = Transaction(animation: .spring(response: 0.28, dampingFraction: 0.92))
+        hideTask?.cancel()
+        hideTask = nil
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
         withTransaction(transaction) {
             viewModel.isVisible  = false
             viewModel.isExpanded = false
         }
 
-        hideTask?.cancel()
-        hideTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            self.ignoresMouseEvents = true
-            self.orderOut(nil)
-            self.previousApp?.activate(options: [])
-            self.previousApp = nil
-        }
+        ignoresMouseEvents = true
+        orderOut(nil)
+        previousApp?.activate(options: [])
+        previousApp = nil
     }
 
     func toggle() { isShowing ? hide() : show() }

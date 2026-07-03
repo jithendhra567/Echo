@@ -53,9 +53,26 @@ struct DynamicIslandView: View {
     }
 
     private var islandScale: CGFloat {
-        guard vm.isVisible else { return 0.96 }
+        guard vm.isVisible else { return 0.93 }
         if vm.isInstantSearchOpen { return instantSearchScale }
         return 1.0
+    }
+
+    /// 3D tilt used on open/close — leans back when hidden, settles flat when visible.
+    private var islandTiltDegrees: Double {
+        vm.isVisible ? 0 : -10
+    }
+
+    /// 2D skew + slight vertical shift for a card-like open/close.
+    private var islandSkewTransform: CGAffineTransform {
+        guard vm.isVisible else {
+            return CGAffineTransform(a: 0.95, b: 0, c: -0.065, d: 0.93, tx: 0, ty: -8)
+        }
+        return .identity
+    }
+
+    private var islandVerticalOffset: CGFloat {
+        vm.isVisible ? 0 : -10
     }
 
     /// Always scale from the geometric center of the island so the open
@@ -120,10 +137,18 @@ struct DynamicIslandView: View {
         }
         .environment(\.colorScheme, .dark)
         .frame(width: islandW(geo), height: islandH(geo))
+        .offset(y: islandVerticalOffset)
+        .rotation3DEffect(
+            .degrees(islandTiltDegrees),
+            axis: (x: 1, y: -0.14, z: 0),
+            anchor: islandScaleAnchor,
+            perspective: 0.58
+        )
+        .transformEffect(islandSkewTransform)
         .scaleEffect(islandScale, anchor: islandScaleAnchor)
         .opacity(vm.isVisible ? 1.0 : 0)
         .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
-        .animation(Self.openSpring, value: vm.isVisible)
+        .animation(vm.isVisible ? Self.openSpring : nil, value: vm.isVisible)
     }
 
     // MARK: - Background
@@ -263,10 +288,13 @@ struct DynamicIslandView: View {
 
     private var appColumn: some View {
         let calcOffset = vm.utilityRowCount
+        let hasContent = vm.isSearching
+            ? !vm.mixedSearchResults.isEmpty
+            : !vm.results.isEmpty || !vm.defaultTabResults.isEmpty || (vm.tabsAreLoading && vm.defaultTabResults.isEmpty)
         return VStack(spacing: 0) {
-            sectionLabel("APPS", active: vm.activePanel == .apps)
+            sectionLabel(vm.isSearching ? "RESULTS" : "APPS", active: vm.activePanel == .apps)
 
-            if vm.results.isEmpty && vm.tabResults.isEmpty && !vm.showsUtilityRow {
+            if !hasContent && !vm.showsUtilityRow {
                 if vm.showsGoogleFallback {
                     VStack(spacing: 1) {
                         fallbackRows(baseOffset: calcOffset)
@@ -298,30 +326,41 @@ struct DynamicIslandView: View {
                             fallbackRows(baseOffset: calcOffset)
                         }
 
-                        ForEach(Array(vm.results.enumerated()), id: \.element.id) { idx, app in
-                            let globalIdx = calcOffset + idx
-                            AppResultRow(
-                                app: app,
-                                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
-                                isLaunching: vm.launchingAppID == app.id
-                            )
-                            .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
-                            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
-                        }
-
-                        if !vm.tabResults.isEmpty {
-                            appsSectionDivider("TABS")
-                                .padding(.top, 4)
-
-                            let appCount = vm.showsGoogleFallback ? vm.webFallbackRowCount : vm.results.count
-                            ForEach(Array(vm.tabResults.enumerated()), id: \.element.id) { idx, tab in
-                                let globalIdx = calcOffset + appCount + idx
-                                BrowserTabResultRow(
-                                    tab: tab,
-                                    isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
+                        if vm.isSearching {
+                            ForEach(Array(vm.mixedSearchResults.enumerated()), id: \.element.id) { idx, item in
+                                let globalIdx = calcOffset + idx
+                                mixedSearchRow(item, globalIdx: globalIdx)
+                            }
+                        } else {
+                            ForEach(Array(vm.results.enumerated()), id: \.element.id) { idx, app in
+                                let globalIdx = calcOffset + idx
+                                AppResultRow(
+                                    app: app,
+                                    isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                                    isLaunching: vm.launchingAppID == app.id
                                 )
-                                .onTapGesture { vm.selectedIndex = globalIdx; vm.openTab(tab) }
+                                .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
                                 .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
+                            }
+
+                            if !vm.defaultTabResults.isEmpty || vm.tabsAreLoading {
+                                tabsSectionLabel
+                                    .padding(.top, 4)
+
+                                if vm.tabsAreLoading && vm.defaultTabResults.isEmpty {
+                                    tabsLoadingRow
+                                }
+
+                                ForEach(Array(vm.defaultTabResults.enumerated()), id: \.element.id) { idx, tab in
+                                    let globalIdx = calcOffset + vm.results.count + idx
+                                    BrowserTabResultRow(
+                                        tab: tab,
+                                        isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                                        isLive: !tab.isSaved
+                                    )
+                                    .onTapGesture { vm.selectedIndex = globalIdx; vm.openTab(tab) }
+                                    .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
+                                }
                             }
                         }
                     }
@@ -331,6 +370,28 @@ struct DynamicIslandView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder
+    private func mixedSearchRow(_ item: LauncherSearchItem, globalIdx: Int) -> some View {
+        switch item {
+        case .app(let app):
+            AppResultRow(
+                app: app,
+                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                isLaunching: vm.launchingAppID == app.id
+            )
+            .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
+            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
+        case .tab(let tab):
+            BrowserTabResultRow(
+                tab: tab,
+                isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
+                isLive: !tab.isSaved
+            )
+            .onTapGesture { vm.selectedIndex = globalIdx; vm.openTab(tab) }
+            .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
+        }
     }
 
     @ViewBuilder
@@ -366,20 +427,33 @@ struct DynamicIslandView: View {
         .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = index } }
     }
 
-    private func appsSectionDivider(_ label: String) -> some View {
-        HStack(spacing: 6) {
-            Rectangle()
-                .fill(Color.white.opacity(0.10))
-                .frame(height: 0.5)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.25))
-                .fixedSize()
-            Rectangle()
-                .fill(Color.white.opacity(0.10))
-                .frame(height: 0.5)
+    private var tabsSectionLabel: some View {
+        HStack(spacing: 5) {
+            Text("TABS")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.28))
+            Circle()
+                .fill(Color.green.opacity(0.88))
+                .frame(width: 5, height: 5)
+            Spacer()
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+        .padding(.bottom, 3)
+    }
+
+    private var tabsLoadingRow: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white.opacity(0.55))
+            Text("Loading open tabs…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.42))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Clipboard column (right)
@@ -466,6 +540,7 @@ struct DynamicIslandView: View {
 private struct BrowserTabResultRow: View {
     let tab: BrowserTab
     let isSelected: Bool
+    var isLive: Bool = false
 
     private var faviconURL: URL? {
         guard let host = URL(string: tab.url)?.host, !host.isEmpty else { return nil }
@@ -511,6 +586,18 @@ private struct BrowserTabResultRow: View {
                 }
             }
             .frame(width: 26, height: 26)
+            .overlay(alignment: .bottomTrailing) {
+                if isLive {
+                    Circle()
+                        .fill(Color.green.opacity(0.92))
+                        .frame(width: 7, height: 7)
+                        .overlay {
+                            Circle()
+                                .stroke(Color.black.opacity(0.35), lineWidth: 0.8)
+                        }
+                        .offset(x: 2, y: 2)
+                }
+            }
 
             // Title + URL
             VStack(alignment: .leading, spacing: 1) {

@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherSettings = LauncherSettings()
         launcherPanel    = DynamicIslandWindow(clipViewModel: viewModel, notchLayoutGuide: notchLayoutGuide)
         launcherPanel.prewarm()
+        launcherPanel.viewModel.warmTabsCache()
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
         monitor.onNewClip   = { [weak self] _ in self?.viewModel.loadClips() }

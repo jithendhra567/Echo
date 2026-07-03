@@ -1,6 +1,18 @@
 import AppKit
 import Observation
 
+enum LauncherSearchItem: Identifiable {
+    case app(AppInfo)
+    case tab(BrowserTab)
+
+    var id: String {
+        switch self {
+        case .app(let app): return "app-\(app.id.uuidString)"
+        case .tab(let tab): return "tab-\(tab.id.uuidString)"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class LauncherViewModel {
@@ -24,6 +36,7 @@ final class LauncherViewModel {
     var isInstantSearchOpen: Bool = false
     /// When both Instant Search and Google rows show, usage picks which appears first.
     var instantSearchFirst: Bool = true
+    var tabsAreLoading: Bool = false
 
     let instantSearchSession = InstantSearchSession()
 
@@ -40,18 +53,26 @@ final class LauncherViewModel {
     private let tabStore  = BrowserTabStore()
 
     private var cachedAllTabs: [BrowserTab] = []
+    private var cachedActiveTabs: [BrowserTab] = []
     private var tabPollerTask: Task<Void, Never>?
     private var appIndexWatcher: AppIndexWatcher?
 
     enum ActivePanel { case apps, clipboard }
+
+    private static let clipboardDisplayLimit = 250
 
     // MARK: - Derived
 
     var filteredClips: [Clip] {
         guard let clipVM else { return [] }
         let query = searchQuery.lowercased()
-        guard !query.isEmpty else { return Array(clipVM.clips.prefix(50)) }
-        return clipVM.clips.filter { clipMatches($0, query: query) }
+        let matched: [Clip]
+        if query.isEmpty {
+            matched = clipVM.clips
+        } else {
+            matched = clipVM.clips.filter { clipMatches($0, query: query) }
+        }
+        return Array(matched.prefix(Self.clipboardDisplayLimit))
     }
 
     private func clipMatches(_ clip: Clip, query: String) -> Bool {
@@ -90,10 +111,32 @@ final class LauncherViewModel {
 
     var utilityRowCount: Int { showsUtilityRow ? 1 : 0 }
 
+    var isSearching: Bool { !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Currently open browser tabs from the latest search results.
+    var liveTabResults: [BrowserTab] { tabResults.filter { !$0.isSaved } }
+
+    /// Saved/history tabs from the latest search results (excludes URLs that are open).
+    var savedTabResults: [BrowserTab] { tabResults.filter { $0.isSaved } }
+
+    /// Default launcher view: active tabs first, then saved history.
+    var defaultTabResults: [BrowserTab] {
+        guard !isSearching else { return [] }
+        return tabResults
+    }
+
+    /// While searching: interleave apps with live tabs, then append saved matches.
+    var mixedSearchResults: [LauncherSearchItem] {
+        guard isSearching else { return [] }
+        var items = Self.interleaveAppsAndTabs(apps: results, tabs: liveTabResults)
+        items.append(contentsOf: savedTabResults.map { .tab($0) })
+        return items
+    }
+
     var combinedCount: Int {
-        utilityRowCount
-            + (showsGoogleFallback ? webFallbackRowCount : results.count)
-            + tabResults.count
+        if showsGoogleFallback { return utilityRowCount + webFallbackRowCount }
+        if isSearching { return utilityRowCount + mixedSearchResults.count }
+        return utilityRowCount + results.count + defaultTabResults.count
     }
 
     init() {
@@ -204,8 +247,23 @@ final class LauncherViewModel {
         // Saved-only tabs (not currently open) get the isSaved flag already set.
         let savedOnly  = savedTabs.filter { !activeURLs.contains($0.url) }
 
+        cachedActiveTabs = activeTabs
         cachedAllTabs = activeTabs + savedOnly
-        tabResults    = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+    }
+
+    /// Loads saved tab history from SQLite — fast path shown while live tabs fetch.
+    private func preloadSavedTabs() async {
+        let savedTabs = await tabStore.fetchAll()
+        let activeURLs = Set(cachedActiveTabs.map(\.url))
+        let savedOnly = savedTabs.filter { !activeURLs.contains($0.url) }
+        cachedAllTabs = cachedActiveTabs + savedOnly
+        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+    }
+
+    /// Background warm-up so the first launcher open may already have tab data.
+    func warmTabsCache() {
+        Task { await refreshTabs() }
     }
 
     // MARK: - Panel switching
@@ -325,18 +383,20 @@ final class LauncherViewModel {
                 return
             }
             let contentIndex = selectedIndex - utilityRowCount
-            let appCount = showsGoogleFallback ? webFallbackRowCount : results.count
-            if contentIndex < appCount {
-                if showsGoogleFallback {
-                    confirmInstantSearchSelection(at: contentIndex)
-                    return
-                }
-                guard results.indices.contains(contentIndex) else { return }
+            if showsGoogleFallback {
+                confirmInstantSearchSelection(at: contentIndex)
+                return
+            }
+            if isSearching {
+                activateMixedSearchItem(at: contentIndex)
+                return
+            }
+            if contentIndex < results.count {
                 launchApp(results[contentIndex])
             } else {
-                let tabIdx = contentIndex - appCount
-                guard tabResults.indices.contains(tabIdx) else { return }
-                openTab(tabResults[tabIdx])
+                let tabIdx = contentIndex - results.count
+                guard defaultTabResults.indices.contains(tabIdx) else { return }
+                openTab(defaultTabResults[tabIdx])
             }
         case .clipboard:
             let clips = filteredClips
@@ -424,19 +484,46 @@ final class LauncherViewModel {
         onLaunch?()
     }
 
+    private func activateMixedSearchItem(at index: Int) {
+        guard mixedSearchResults.indices.contains(index) else { return }
+        switch mixedSearchResults[index] {
+        case .app(let app):     launchApp(app)
+        case .tab(let tab):     openTab(tab)
+        }
+    }
+
+    private static func interleaveAppsAndTabs(apps: [AppInfo], tabs: [BrowserTab]) -> [LauncherSearchItem] {
+        var items: [LauncherSearchItem] = []
+        items.reserveCapacity(apps.count + tabs.count)
+        var appIndex = 0
+        var tabIndex = 0
+        while appIndex < apps.count || tabIndex < tabs.count {
+            if appIndex < apps.count {
+                items.append(.app(apps[appIndex]))
+                appIndex += 1
+            }
+            if tabIndex < tabs.count {
+                items.append(.tab(tabs[tabIndex]))
+                tabIndex += 1
+            }
+        }
+        return items
+    }
+
     func dismiss() { onDismiss?() }
 
     func expand() {
         tabPollerTask?.cancel()
         tabPollerTask = Task { [weak self] in
-            // Defer the first AppleScript tab fetch until the open animation settles.
-            try? await Task.sleep(for: .milliseconds(320))
-            guard !Task.isCancelled else { return }
-            await self?.refreshTabs()
+            guard let self else { return }
+            tabsAreLoading = true
+            await preloadSavedTabs()
+            await refreshTabs()
+            tabsAreLoading = false
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
                 guard !Task.isCancelled else { return }
-                await self?.refreshTabs()
+                await refreshTabs()
             }
         }
     }
@@ -458,6 +545,7 @@ final class LauncherViewModel {
         utilityIsLoading      = false
         utilityError          = nil
         ignoreHover           = true
+        tabsAreLoading        = false
         if isInstantSearchOpen {
             isInstantSearchOpen = false
             onInstantSearchChanged?(false)

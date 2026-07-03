@@ -18,12 +18,27 @@ final class BrowserTabEngine: Sendable {
         return tabs
     }
 
-    func search(query: String, in tabs: [BrowserTab]) -> [BrowserTab] {
-        guard !query.isEmpty else { return Array(tabs.prefix(8)) }
-        let q = query.lowercased()
-        return tabs.filter {
-            $0.title.lowercased().contains(q) || $0.url.lowercased().contains(q)
+    func search(query: String, in tabs: [BrowserTab], limit: Int = 8) -> [BrowserTab] {
+        let matched: [BrowserTab]
+        if query.isEmpty {
+            matched = tabs
+        } else {
+            let q = query.lowercased()
+            matched = tabs.filter {
+                $0.title.lowercased().contains(q) || $0.url.lowercased().contains(q)
+            }
         }
+        let prioritized = Self.prioritizeActiveFirst(matched)
+        if query.isEmpty {
+            return Array(prioritized.prefix(limit))
+        }
+        return prioritized
+    }
+
+    private static func prioritizeActiveFirst(_ tabs: [BrowserTab]) -> [BrowserTab] {
+        let live  = tabs.filter { !$0.isSaved }
+        let saved = tabs.filter { $0.isSaved }
+        return live + saved
     }
 
     /// Brings an already-open tab to the front instead of opening a new one.
