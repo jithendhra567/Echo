@@ -86,7 +86,7 @@ final class ClipboardPanel: NSPanel {
         if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return event }  // 53 = Escape
-            Task { @MainActor [weak self] in self?.hide() }
+            self?.hide()
             return nil
         }
     }

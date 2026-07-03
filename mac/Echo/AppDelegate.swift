@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel            = ClipboardPanel(viewModel: viewModel)
         launcherSettings = LauncherSettings()
         launcherPanel    = DynamicIslandWindow(clipViewModel: viewModel, notchLayoutGuide: notchLayoutGuide)
+        launcherPanel.prewarm()
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
         monitor.onNewClip   = { [weak self] _ in self?.viewModel.loadClips() }
@@ -155,7 +156,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard code == 53 else { return }   // Escape only — hotkeys handled by Carbon
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if self.panel.isShowing { self.panel.hide() }
+                if self.panel.isShowing {
+                    self.panel.hide()
+                } else if self.launcherPanel.isShowing,
+                          !self.launcherPanel.viewModel.handleEscape() {
+                    self.launcherPanel.hide()
+                }
             }
         }
     }

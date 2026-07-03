@@ -32,9 +32,8 @@ struct DynamicIslandView: View {
 
     private static let launcherSpring = Animation.spring(response: 0.34, dampingFraction: 0.78)
     private static let launcherSpringBouncy = Animation.spring(response: 0.34, dampingFraction: 0.72)
-    /// The single smooth spring used for the open/close animation.
-    /// Slightly slower + well-damped so the panel feels weighty rather than poppy.
-    private static let openSpring = Animation.spring(response: 0.44, dampingFraction: 0.86)
+    /// Single spring for open/close — matched to `DynamicIslandWindow.show()`.
+    private static let openSpring = Animation.spring(response: 0.38, dampingFraction: 0.88)
 
     private var cr: CGFloat {
         vm.isInstantSearchOpen ? 20 : 24
@@ -54,7 +53,7 @@ struct DynamicIslandView: View {
     }
 
     private var islandScale: CGFloat {
-        guard vm.isVisible else { return 0.94 }
+        guard vm.isVisible else { return 0.96 }
         if vm.isInstantSearchOpen { return instantSearchScale }
         return 1.0
     }
@@ -75,17 +74,11 @@ struct DynamicIslandView: View {
         .onChange(of: vm.isExpanded) { _, expanded in
             if expanded {
                 vm.expand()
-                Task {
-                    try? await Task.sleep(for: .milliseconds(50))
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.84)) {
-                        showContent = true
-                    }
-                    isSearchFocused = true
-                    try? await Task.sleep(for: .milliseconds(350))
-                    withAnimation(.easeIn(duration: 0.25)) { showTimestamps = true }
-                }
+                showContent = true
+                showTimestamps = true
+                isSearchFocused = true
             } else {
-                withAnimation(.easeIn(duration: 0.10)) { showContent = false }
+                showContent = false
                 isSearchFocused = false
                 showTimestamps = false
             }
@@ -120,7 +113,10 @@ struct DynamicIslandView: View {
     private func islandRoot(_ geo: GeometryProxy) -> some View {
         ZStack {
             islandBackground
-            if showContent { expandedContent.transition(.opacity) }
+            if showContent {
+                expandedContent
+                    .transition(.opacity.animation(Self.openSpring))
+            }
         }
         .environment(\.colorScheme, .dark)
         .frame(width: islandW(geo), height: islandH(geo))
@@ -291,12 +287,6 @@ struct DynamicIslandView: View {
                                 errorMessage: vm.utilityError,
                                 isSelected: vm.activePanel == .apps && vm.selectedIndex == 0
                             )
-                            .opacity(showContent ? 1 : 0)
-                            .offset(y: showContent ? 0 : -6)
-                            .animation(
-                                .spring(response: 0.28, dampingFraction: 0.80),
-                                value: showContent
-                            )
                             .onTapGesture {
                                 vm.selectedIndex = 0
                                 vm.copyUtilityResult()
@@ -315,13 +305,6 @@ struct DynamicIslandView: View {
                                 isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex,
                                 isLaunching: vm.launchingAppID == app.id
                             )
-                            .opacity(showContent ? 1 : 0)
-                            .offset(y: showContent ? 0 : -6)
-                            .animation(
-                                .spring(response: 0.28, dampingFraction: 0.80)
-                                    .delay(Double(globalIdx) * 0.016),
-                                value: showContent
-                            )
                             .onTapGesture { vm.selectedIndex = globalIdx; vm.launchApp(app) }
                             .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
                         }
@@ -336,13 +319,6 @@ struct DynamicIslandView: View {
                                 BrowserTabResultRow(
                                     tab: tab,
                                     isSelected: vm.activePanel == .apps && globalIdx == vm.selectedIndex
-                                )
-                                .opacity(showContent ? 1 : 0)
-                                .offset(y: showContent ? 0 : -6)
-                                .animation(
-                                    .spring(response: 0.28, dampingFraction: 0.80)
-                                        .delay(Double(globalIdx) * 0.016),
-                                    value: showContent
                                 )
                                 .onTapGesture { vm.selectedIndex = globalIdx; vm.openTab(tab) }
                                 .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
@@ -423,13 +399,6 @@ struct DynamicIslandView: View {
                                 isSelected: vm.activePanel == .clipboard && idx == vm.clipSelectedIndex,
                                 isCopied: vm.copiedClipID == clip.id,
                                 showTimestamp: showTimestamps
-                            )
-                            .opacity(showContent ? 1 : 0)
-                            .offset(y: showContent ? 0 : -6)
-                            .animation(
-                                .spring(response: 0.28, dampingFraction: 0.80)
-                                    .delay(Double(idx) * 0.016 + 0.03),
-                                value: showContent
                             )
                             .onTapGesture { vm.copyClip(clip) }
                             .onHover { if $0 && !vm.ignoreHover { vm.clipSelectedIndex = idx } }

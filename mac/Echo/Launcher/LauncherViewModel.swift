@@ -215,6 +215,20 @@ final class LauncherViewModel {
         if activePanel == .clipboard { clipSelectedIndex = 0 }
     }
 
+    /// Handles Escape with nested dismiss: instant search → clipboard → launcher.
+    /// Returns `true` when the key press was consumed without closing the launcher.
+    func handleEscape() -> Bool {
+        if isInstantSearchOpen {
+            closeInstantSearch()
+            return true
+        }
+        if activePanel == .clipboard {
+            activePanel = .apps
+            return true
+        }
+        return false
+    }
+
     // MARK: - Navigation
 
     func selectNext() {
@@ -402,11 +416,8 @@ final class LauncherViewModel {
         Task {
             await tabStore.touch(url: tab.url)
             if tab.isSaved {
-                // Tab is from history (not currently open) — open a new tab.
-                guard let url = URL(string: tab.url) else { return }
-                NSWorkspace.shared.open(url)
+                await tabEngine.openURL(tab.url, in: tab.browser)
             } else {
-                // Tab is currently open — focus the existing tab via AppleScript.
                 await tabEngine.focusTab(tab)
             }
         }
@@ -416,12 +427,16 @@ final class LauncherViewModel {
     func dismiss() { onDismiss?() }
 
     func expand() {
-        Task { await reindexApps() }
         tabPollerTask?.cancel()
         tabPollerTask = Task { [weak self] in
+            // Defer the first AppleScript tab fetch until the open animation settles.
+            try? await Task.sleep(for: .milliseconds(320))
+            guard !Task.isCancelled else { return }
+            await self?.refreshTabs()
             while !Task.isCancelled {
-                await self?.refreshTabs()
                 try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                await self?.refreshTabs()
             }
         }
     }
@@ -443,12 +458,20 @@ final class LauncherViewModel {
         utilityIsLoading      = false
         utilityError          = nil
         ignoreHover           = true
-        isInstantSearchOpen   = false
+        if isInstantSearchOpen {
+            isInstantSearchOpen = false
+            onInstantSearchChanged?(false)
+        }
         instantSearchSession.reset()
-        onInstantSearchChanged?(false)
-        Task {
-            await refreshDefaults()
-            instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+        if results.isEmpty {
+            Task {
+                await refreshDefaults()
+                instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+            }
+        } else {
+            Task {
+                instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
+            }
         }
     }
 }

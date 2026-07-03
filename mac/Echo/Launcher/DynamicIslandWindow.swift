@@ -19,6 +19,8 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     private var previousApp: NSRunningApplication?
     private var localKeyMonitor: Any?
     private var hideTask: Task<Void, Never>?
+    /// Ignores `windowDidResignKey` briefly after show so activation churn cannot instantly dismiss.
+    private var suppressDismissUntil: Date?
     private(set) var isShowing = false
 
     static let windowSize = CGSize(width: 860, height: 600)
@@ -97,7 +99,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     }
 
     private func applyInstantSearchLayout(_ open: Bool) {
-        guard let screen = NSScreen.main else { return }
+        guard isShowing, let screen = NSScreen.main else { return }
         let oldFrame = frame
         let visible = screen.visibleFrame
         let islandPad = CGSize(width: 100, height: 100)
@@ -135,6 +137,17 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     // MARK: - Show / Hide
 
+    /// Warms the SwiftUI hosting layer so the first hotkey open does not pay layout cost.
+    func prewarm() {
+        reposition()
+        let prior = alphaValue
+        alphaValue = 0.001
+        orderFrontRegardless()
+        displayIfNeeded()
+        orderOut(nil)
+        alphaValue = prior
+    }
+
     func show() {
         guard !isShowing else { return }
         // Cancel any in-flight hide so its deferred orderOut won't fire.
@@ -143,25 +156,28 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
         previousApp = NSWorkspace.shared.frontmostApplication
         isShowing   = true
+        suppressDismissUntil = Date().addingTimeInterval(0.5)
         viewModel.reset()          // resets isVisible=false, isExpanded=false
-        clipViewModel.loadClips()  // refresh clipboard history
         reposition()
         ignoresMouseEvents = false
         acceptsMouseMovedEvents = true   // needed to detect first move for hover-guard
 
-        // Activate Echo so the panel can become key and accept keyboard input.
-        NSApp.activate(ignoringOtherApps: true)
         orderFrontRegardless()
-        makeKeyAndOrderFront(nil)
 
-        // Single smooth scale + fade from the center of the island.
-        // `isExpanded` is flipped in the same transaction so the content reveal
-        // (gated on it via onChange) starts in lock-step with the open.
-        withAnimation(.spring(response: 0.44, dampingFraction: 0.86)) {
-            viewModel.isVisible  = true
-            viewModel.isExpanded = true
+        // Present on the next turn so the window is on-screen before we become key.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShowing else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            self.makeKeyAndOrderFront(nil)
+
+            var transaction = Transaction(animation: .spring(response: 0.38, dampingFraction: 0.88))
+            transaction.disablesAnimations = false
+            withTransaction(transaction) {
+                self.viewModel.isVisible  = true
+                self.viewModel.isExpanded = true
+            }
+            self.setupKeyMonitor()
         }
-        setupKeyMonitor()
     }
 
     func hide() {
@@ -170,14 +186,16 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         tearDownKeyMonitor()
 
         // Fade out and scale back to the center — mirrors the open animation.
-        withAnimation(.spring(response: 0.26, dampingFraction: 0.92)) {
+        suppressDismissUntil = nil
+        var transaction = Transaction(animation: .spring(response: 0.28, dampingFraction: 0.92))
+        withTransaction(transaction) {
             viewModel.isVisible  = false
             viewModel.isExpanded = false
         }
 
         hideTask?.cancel()
         hideTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(280))
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             self.ignoresMouseEvents = true
             self.orderOut(nil)
@@ -207,9 +225,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
                 switch code {
                 case 48:      self.viewModel.switchPanel()
                 case 53:
-                    if self.viewModel.isInstantSearchOpen {
-                        self.viewModel.closeInstantSearch()
-                    } else {
+                    if !self.viewModel.handleEscape() {
                         self.hide()
                     }
                 case 36, 76:
@@ -235,6 +251,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         guard isShowing else { return }
+        if let until = suppressDismissUntil, Date() < until { return }
         hide()
     }
 

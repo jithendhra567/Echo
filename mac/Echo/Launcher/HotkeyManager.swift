@@ -60,7 +60,13 @@ final class HotkeyManager {
                     &hkID
                 )
                 let id = hkID.id
-                Task { @MainActor in HotkeyManager._handlers[id]?() }
+                // Carbon delivers on the main thread — invoke immediately to avoid
+                // a Task hop that can lose the first open when activation races.
+                if Thread.isMainThread {
+                    MainActor.assumeIsolated { HotkeyManager._handlers[id]?() }
+                } else {
+                    DispatchQueue.main.async { HotkeyManager._handlers[id]?() }
+                }
                 return noErr
             },
             1, &spec, nil, &Self.handlerRef

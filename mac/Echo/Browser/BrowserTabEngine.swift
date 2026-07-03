@@ -2,6 +2,10 @@ import AppKit
 
 final class BrowserTabEngine: Sendable {
 
+    /// Field / record separators unlikely to appear in titles or URLs.
+    private static let fieldSep = "\u{1F}"
+    private static let recordSep = "\u{1E}"
+
     func fetchTabs() async -> [BrowserTab] {
         var tabs: [BrowserTab] = []
         for browser in BrowserTab.Browser.allCases {
@@ -24,16 +28,97 @@ final class BrowserTabEngine: Sendable {
 
     /// Brings an already-open tab to the front instead of opening a new one.
     func focusTab(_ tab: BrowserTab) async {
-        let url = tab.url
         let script: String
-        switch tab.browser {
+        if let windowIndex = tab.windowIndex, let tabIndex = tab.tabIndex {
+            script = focusByIndexScript(browser: tab.browser, windowIndex: windowIndex, tabIndex: tabIndex)
+        } else {
+            script = focusByURLScript(browser: tab.browser, url: tab.url)
+        }
+        await runAppleScript(script)
+    }
+
+    /// Opens a URL in a specific browser (used for saved tabs from history).
+    func openURL(_ url: String, in browser: BrowserTab.Browser) async {
+        let escaped = Self.escapeAppleScript(url)
+        let script: String
+        switch browser {
         case .safari:
             script = """
             tell application "Safari"
+                tell front window
+                    set current tab to (make new tab with properties {URL:"\(escaped)"})
+                end tell
+                activate
+            end tell
+            """
+        case .chrome:
+            script = """
+            tell application "Google Chrome"
+                tell front window
+                    make new tab with properties {URL:"\(escaped)"}
+                end tell
+                activate
+            end tell
+            """
+        case .arc:
+            script = """
+            tell application "Arc"
+                tell front window
+                    make new tab with properties {URL:"\(escaped)"}
+                end tell
+                activate
+            end tell
+            """
+        }
+        await runAppleScript(script)
+    }
+
+    // MARK: - Private
+
+    private func focusByIndexScript(browser: BrowserTab.Browser, windowIndex: Int, tabIndex: Int) -> String {
+        switch browser {
+        case .arc:
+            // Arc uses `tell tab N to select`, not Chrome's `active tab index`.
+            return """
+            tell application "Arc"
+                tell window \(windowIndex)
+                    tell tab \(tabIndex) to select
+                end tell
+                activate
+            end tell
+            """
+        case .chrome:
+            return """
+            tell application "Google Chrome"
+                tell window \(windowIndex)
+                    set active tab index to \(tabIndex)
+                    set index to 1
+                end tell
+                activate
+            end tell
+            """
+        case .safari:
+            return """
+            tell application "Safari"
+                tell window \(windowIndex)
+                    set current tab to tab \(tabIndex)
+                    set index to 1
+                end tell
+                activate
+            end tell
+            """
+        }
+    }
+
+    private func focusByURLScript(browser: BrowserTab.Browser, url: String) -> String {
+        let match = Self.appleScriptURLMatchExpression(for: url, property: "URL of t")
+        switch browser {
+        case .safari:
+            return """
+            tell application "Safari"
                 repeat with w in windows
-                    set tabList to tabs of w
-                    repeat with t in tabList
-                        if (URL of t) is "\(url)" then
+                    repeat with t in tabs of w
+                        if \(match) then
                             set current tab of w to t
                             set index of w to 1
                             activate
@@ -44,103 +129,149 @@ final class BrowserTabEngine: Sendable {
             end tell
             """
         case .chrome:
-            script = """
+            return """
             tell application "Google Chrome"
+                set wIdx to 1
                 repeat with w in windows
-                    set tabList to tabs of w
                     set tIdx to 1
-                    repeat with t in tabList
-                        if (URL of t) is "\(url)" then
-                            set active tab index of w to tIdx
-                            set index of w to 1
+                    repeat with t in tabs of w
+                        if \(match) then
+                            tell window wIdx
+                                set active tab index to tIdx
+                                set index to 1
+                            end tell
                             activate
                             return
                         end if
                         set tIdx to tIdx + 1
                     end repeat
+                    set wIdx to wIdx + 1
                 end repeat
             end tell
             """
         case .arc:
-            script = """
-            tell application "Arc" 
+            return """
+            tell application "Arc"
+                set wIdx to 1
                 repeat with w in windows
-                    set tabList to tabs of w
                     set tIdx to 1
-                    repeat with t in tabList
-                        if (URL of t) is "\(url)" then
-                            set active tab index of w to tIdx
-                            set index of w to 1
+                    repeat with t in tabs of w
+                        if \(match) then
+                            tell window wIdx
+                                tell tab tIdx to select
+                            end tell
                             activate
                             return
                         end if
                         set tIdx to tIdx + 1
                     end repeat
+                    set wIdx to wIdx + 1
                 end repeat
             end tell
             """
         }
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue(label: "echo.applescript.focus", qos: .userInitiated).async {
-                var error: NSDictionary?
-                NSAppleScript(source: script)?.executeAndReturnError(&error)
-                continuation.resume()
-            }
-        }
     }
 
-    // MARK: - Private
-
     private func query(browser: BrowserTab.Browser) async throws -> [BrowserTab] {
-        // Build a flat list — "title\nurl\ntitle\nurl..." separated by newlines
-        // so we can parse with split(separator:) without touching NSAppleEventDescriptor nesting.
+        let fs = Self.fieldSep
+        let rs = Self.recordSep
         let script: String
         switch browser {
         case .safari:
-            // Safari has no public AppleScript API to detect private windows.
-            // Wrapping each window in `try` causes Safari to silently skip
-            // windows it refuses to expose (e.g. restricted private windows on
-            // newer macOS). We also filter out internal `about:` URLs below.
             script = """
+            on sanitize(t)
+                set t to my replaceChars(t, "\(fs)", " ")
+                set t to my replaceChars(t, "\(rs)", " ")
+                return t
+            end sanitize
+            on replaceChars(theText, find, replace)
+                set AppleScript's text item delimiters to find
+                set parts to every text item of theText
+                set AppleScript's text item delimiters to replace
+                set theText to parts as string
+                set AppleScript's text item delimiters to ""
+                return theText
+            end replaceChars
             set out to ""
             tell application "Safari"
+                set wIdx to 1
                 repeat with w in windows
                     try
+                        set tIdx to 1
                         repeat with t in tabs of w
                             set tURL to URL of t
                             if tURL is not missing value then
-                                set out to out & (name of t) & "\n" & tURL & "\n"
+                                set out to out & my sanitize(name of t) & "\(fs)" & tURL & "\(fs)" & wIdx & "\(fs)" & tIdx & "\(rs)"
                             end if
+                            set tIdx to tIdx + 1
                         end repeat
                     end try
+                    set wIdx to wIdx + 1
                 end repeat
             end tell
             return out
             """
         case .chrome:
-            // Skip incognito windows using Chrome's AppleScript `mode` property.
             script = """
+            on sanitize(t)
+                set t to my replaceChars(t, "\(fs)", " ")
+                set t to my replaceChars(t, "\(rs)", " ")
+                return t
+            end sanitize
+            on replaceChars(theText, find, replace)
+                set AppleScript's text item delimiters to find
+                set parts to every text item of theText
+                set AppleScript's text item delimiters to replace
+                set theText to parts as string
+                set AppleScript's text item delimiters to ""
+                return theText
+            end replaceChars
             set out to ""
             tell application "Google Chrome"
+                set wIdx to 1
                 repeat with w in windows
                     if mode of w is "normal" then
+                        set tIdx to 1
                         repeat with t in tabs of w
-                            set out to out & (title of t) & "\n" & (URL of t) & "\n"
+                            set out to out & my sanitize(title of t) & "\(fs)" & (URL of t) & "\(fs)" & wIdx & "\(fs)" & tIdx & "\(rs)"
+                            set tIdx to tIdx + 1
                         end repeat
                     end if
+                    set wIdx to wIdx + 1
                 end repeat
             end tell
             return out
             """
         case .arc:
-            // Arc has no traditional incognito mode; include all tabs.
             script = """
+            on sanitize(t)
+                set t to my replaceChars(t, "\(fs)", " ")
+                set t to my replaceChars(t, "\(rs)", " ")
+                return t
+            end sanitize
+            on replaceChars(theText, find, replace)
+                set AppleScript's text item delimiters to find
+                set parts to every text item of theText
+                set AppleScript's text item delimiters to replace
+                set theText to parts as string
+                set AppleScript's text item delimiters to ""
+                return theText
+            end replaceChars
             set out to ""
             tell application "Arc"
+                set wIdx to 1
                 repeat with w in windows
-                    repeat with t in tabs of w
-                        set out to out & (title of t) & "\n" & (URL of t) & "\n"
-                    end repeat
+                    try
+                        set tIdx to 1
+                        repeat with t in tabs of w
+                            set tURL to URL of t
+                            if tURL is not missing value then
+                                set out to out & my sanitize(title of t) & "\(fs)" & tURL & "\(fs)" & wIdx & "\(fs)" & tIdx & "\(rs)"
+                            end if
+                            set tIdx to tIdx + 1
+                        end repeat
+                    end try
+                    set wIdx to wIdx + 1
                 end repeat
             end tell
             return out
@@ -148,7 +279,6 @@ final class BrowserTabEngine: Sendable {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            // NSAppleScript must not run on MainActor — use a dedicated serial queue.
             DispatchQueue(label: "echo.applescript", qos: .userInitiated).async {
                 var error: NSDictionary?
                 guard let appleScript = NSAppleScript(source: script) else {
@@ -162,29 +292,81 @@ final class BrowserTabEngine: Sendable {
                 }
 
                 let raw = result.stringValue ?? ""
-                let lines = raw.components(separatedBy: "\n").filter { !$0.isEmpty }
                 var tabs: [BrowserTab] = []
-                var i = 0
-                while i + 1 < lines.count {
-                    let title = lines[i]
-                    let url   = lines[i + 1]
-                    // Drop internal browser pages (new-tab, error pages, etc.)
-                    // that have no meaningful content to record.
-                    if !Self.isInternalURL(url) {
-                        tabs.append(BrowserTab(id: UUID(), title: title, url: url, browser: browser))
-                    }
-                    i += 2
+                for record in raw.split(separator: Character(UnicodeScalar(0x1E)!), omittingEmptySubsequences: true) {
+                    let fields = record.split(separator: Character(UnicodeScalar(0x1F)!), omittingEmptySubsequences: false)
+                    guard fields.count >= 4,
+                          let windowIndex = Int(fields[2]),
+                          let tabIndex = Int(fields[3])
+                    else { continue }
+
+                    let title = String(fields[0])
+                    let url = String(fields[1])
+                    guard !Self.isInternalURL(url) else { continue }
+
+                    tabs.append(BrowserTab(
+                        id: UUID(),
+                        title: title,
+                        url: url,
+                        browser: browser,
+                        windowIndex: windowIndex,
+                        tabIndex: tabIndex
+                    ))
                 }
                 continuation.resume(returning: tabs)
             }
         }
     }
 
-    /// Returns true for browser-internal URLs that should never be recorded
-    /// (new-tab pages, error pages, extension pages, devtools, etc.).
+    private func runAppleScript(_ script: String) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue(label: "echo.applescript.focus", qos: .userInitiated).async {
+                var error: NSDictionary?
+                NSAppleScript(source: script)?.executeAndReturnError(&error)
+                continuation.resume()
+            }
+        }
+    }
+
+    private nonisolated static func escapeAppleScript(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    private nonisolated static func appleScriptURLMatchExpression(for url: String, property: String) -> String {
+        urlMatchCandidates(for: url)
+            .map { candidate in
+                "(\(property)) is \"\(escapeAppleScript(candidate))\""
+            }
+            .joined(separator: " or ")
+    }
+
+    private nonisolated static func urlMatchCandidates(for url: String) -> [String] {
+        var candidates = Set<String>([url])
+        if url.hasSuffix("/") {
+            candidates.insert(String(url.dropLast()))
+        } else {
+            candidates.insert(url + "/")
+        }
+        if let parsed = URL(string: url), var comps = URLComponents(url: parsed, resolvingAgainstBaseURL: false) {
+            comps.fragment = nil
+            if let stripped = comps.string {
+                candidates.insert(stripped)
+                if stripped.hasSuffix("/") {
+                    candidates.insert(String(stripped.dropLast()))
+                } else {
+                    candidates.insert(stripped + "/")
+                }
+            }
+        }
+        return Array(candidates)
+    }
+
     private nonisolated static func isInternalURL(_ url: String) -> Bool {
         let internalPrefixes = [
             "about:",
+            "arc://",
             "chrome://",
             "chrome-extension://",
             "chrome-devtools://",
