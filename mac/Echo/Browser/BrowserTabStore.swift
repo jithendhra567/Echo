@@ -21,6 +21,7 @@ actor BrowserTabStore {
 
     func save(_ tab: BrowserTab) {
         guard let db else { return }
+        guard !AppSettings.isWebsiteIgnored(tab.url) else { return }
         let now     = Date().timeIntervalSince1970
         let expires = now + Self.ttl
         let sql = """
@@ -70,9 +71,37 @@ actor BrowserTabStore {
                   let rawBsr    = columnText(stmt, 2),
                   let browser   = BrowserTab.Browser(rawValue: rawBsr)
             else { continue }
+            guard !AppSettings.isWebsiteIgnored(url) else { continue }
             tabs.append(BrowserTab(id: UUID(), title: title, url: url, browser: browser, isSaved: true))
         }
         return tabs
+    }
+
+    /// Permanently removes saved history for a domain (and its subdomains).
+    func deleteMatching(domain: String) {
+        guard let db else { return }
+        let all = fetchAllRaw()
+        for url in all {
+            guard let host = AppSettings.host(of: url) else { continue }
+            var h = host
+            if h.hasPrefix("www.") { h.removeFirst(4) }
+            guard h == domain || h.hasSuffix("." + domain) else { continue }
+            prepare(db: db, sql: "DELETE FROM browser_tabs WHERE url = ?;") { stmt in
+                bindText(stmt, 1, url)
+            }
+        }
+    }
+
+    private func fetchAllRaw() -> [String] {
+        guard let db else { return [] }
+        var urls: [String] = []
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT url FROM browser_tabs;", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let url = columnText(stmt, 0) { urls.append(url) }
+        }
+        return urls
     }
 
     func prune() {

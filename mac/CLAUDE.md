@@ -90,7 +90,13 @@ Echo/
 │   └── MediaRemote/           # Now-playing info via MediaRemote private framework
 │
 ├── Utilities/EchoIconImage.swift  # Shared sonar-ring drawing logic for menu bar + app icon renderer
-├── Dashboard/DashboardView.swift  # NavigationSplitView: Launcher settings, Clipboard history, About
+├── Settings/AppSettings.swift     # @Observable UserDefaults-backed app settings (retention days,
+│                                  #   ignored websites/apps, pause capture, image capture, concealed-skip);
+│                                  #   nonisolated static readers for actor access
+├── Dashboard/
+│   ├── DashboardView.swift        # NavigationSplitView: General / Clipboard / Privacy / Statistics / History / About
+│   └── StatsProvider.swift        # Aggregates stats: top websites (tab history + URL clips),
+│                                  #   most-launched apps (launcher usage), clipboard aggregations
 ├── Permissions/AccessibilityPermission.swift
 └── Info.plist
 ```

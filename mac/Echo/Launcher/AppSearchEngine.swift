@@ -5,7 +5,8 @@ actor AppSearchEngine {
     private(set) var allApps: [AppInfo] = []
     private var usageCounts: [String: Int] = [:]
 
-    private static let usageKey = "echo_launcher_usage"
+    /// UserDefaults key for launch-frequency counts — also read by StatsProvider.
+    static let usageKey = "echo_launcher_usage"
 
     /// Directories scanned for `.app` bundles and watched for installs/uninstalls.
     static var applicationDirectoryPaths: [String] {

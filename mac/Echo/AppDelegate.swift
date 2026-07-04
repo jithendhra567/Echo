@@ -5,7 +5,9 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let notchLayoutGuide = NotchLayoutGuide()
     let launchAtLogin = LaunchAtLoginController()
+    let appSettings = AppSettings()
 
+    private var statsProvider: StatsProvider!
     private var store: ClipStore!
     private var monitor: ClipboardMonitor!
     private var viewModel: ClipViewModel!
@@ -27,7 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         store            = ClipStore()
-        monitor          = ClipboardMonitor(store: store)
+        monitor          = ClipboardMonitor(store: store, settings: appSettings)
+        statsProvider    = StatsProvider()
         viewModel        = ClipViewModel(store: store, monitor: monitor)
         panel            = ClipboardPanel(viewModel: viewModel)
         launcherSettings = LauncherSettings()
@@ -128,6 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(launchAtLogin)
             .environment(viewModel)
             .environment(notchLayoutGuide)
+            .environment(appSettings)
+            .environment(statsProvider)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 540),

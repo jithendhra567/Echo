@@ -11,7 +11,8 @@ actor ClipStore {
     nonisolated(unsafe) private var db: OpaquePointer?
 
     /// Unpinned clips older than this are removed automatically.
-    private static let retentionTTL: TimeInterval = 30 * 24 * 3600
+    /// User-configurable via the Dashboard (defaults to 30 days).
+    private static var retentionTTL: TimeInterval { AppSettings.storedRetentionTTL }
 
     init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -98,6 +99,15 @@ actor ClipStore {
         prepare(db: db, sql: "DELETE FROM clips WHERE id = ?;") { stmt in
             bindText(stmt, 1, id.uuidString)
         }
+    }
+
+    /// Removes history. Pinned clips survive unless `includePinned` is set.
+    func deleteAll(includePinned: Bool) {
+        guard let db else { return }
+        let sql = includePinned
+            ? "DELETE FROM clips;"
+            : "DELETE FROM clips WHERE is_pinned = 0;"
+        sqlite3_exec(db, sql, nil, nil, nil)
     }
 
     func setPin(id: UUID, pinned: Bool) {

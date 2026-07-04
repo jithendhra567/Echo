@@ -98,6 +98,34 @@ final class ClipViewModel {
         Task { await store.delete(id: clip.id) }
     }
 
+    /// Clears clipboard history. Pinned clips survive unless `includePinned`.
+    func clearHistory(includePinned: Bool) {
+        clips = includePinned ? [] : clips.filter(\.isPinned)
+        Task {
+            await store.deleteAll(includePinned: includePinned)
+            loadClips()
+        }
+    }
+
+    /// Removes already-saved clips whose URL belongs to `domain` (called when
+    /// the user adds a website to the ignore list).
+    func purgeClips(fromDomain domain: String) {
+        let doomed = clips.filter { clip in
+            guard let text = clip.plainText,
+                  let host = AppSettings.host(of: text)
+            else { return false }
+            var h = host
+            if h.hasPrefix("www.") { h.removeFirst(4) }
+            return h == domain || h.hasSuffix("." + domain)
+        }
+        guard !doomed.isEmpty else { return }
+        let ids = doomed.map(\.id)
+        clips.removeAll { ids.contains($0.id) }
+        Task {
+            for id in ids { await store.delete(id: id) }
+        }
+    }
+
     func pin(_ clip: Clip) {
         let pinned = !clip.isPinned
         if let i = clips.firstIndex(where: { $0.id == clip.id }) {
