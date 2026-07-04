@@ -35,44 +35,64 @@ final class ClipboardPanel: NSPanel {
 
     // MARK: - Show / Hide
 
+    /// Smooth deceleration — no overshoot, feels like rising from below the dock.
+    private static let slideUpTiming = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
+    private static let slideDownTiming = CAMediaTimingFunction(controlPoints: 0.55, 0.0, 0.75, 0.4)
+
+    private func layoutFrames(for screen: NSScreen) -> (start: NSRect, final: NSRect) {
+        let vis = screen.visibleFrame
+        let w = vis.width - 40
+        let h: CGFloat = 270
+        let x = vis.minX + 20
+        let final = NSRect(x: x, y: vis.minY + 12, width: w, height: h)
+        // Start fully below the visible frame so the panel clearly emerges from off-screen.
+        let start = NSRect(x: x, y: vis.minY - h - 36, width: w, height: h)
+        return (start, final)
+    }
+
     func show() {
         guard !isShowing, let screen = NSScreen.main else { return }
-        let vis = screen.visibleFrame
-        let (x, w, h) = (vis.minX + 20, vis.width - 40, CGFloat(270))
+        let frames = layoutFrames(for: screen)
 
-        // Start off-screen below the dock, then spring up
-        setFrame(NSRect(x: x, y: vis.minY - h - 10, width: w, height: h), display: false)
+        alphaValue = 0
+        setFrame(frames.start, display: false)
         isShowing = true
-        // Activate Echo so the search field can receive keyboard input.
-        NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
         setupKeyMonitor()
 
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.55
-            // Cubic-bezier approximating a spring with slight overshoot
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.34, 1.56, 0.64, 1.0)
-            animator().setFrame(NSRect(x: x, y: vis.minY + 10, width: w, height: h), display: true)
+        // Wait one turn so the window is composited at the off-screen pose before animating.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShowing else { return }
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.50
+                ctx.timingFunction = Self.slideUpTiming
+                ctx.allowsImplicitAnimation = true
+                self.animator().alphaValue = 1
+                self.animator().setFrame(frames.final, display: true)
+            }
         }
     }
 
     func hide() {
-        guard isShowing else { return }
+        guard isShowing, let screen = NSScreen.main else { return }
         let f = frame
+        let vis = screen.visibleFrame
         isShowing = false
         tearDownKeyMonitor()
 
+        let exitFrame = NSRect(x: f.minX, y: vis.minY - f.height - 36, width: f.width, height: f.height)
+
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.28
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            animator().setFrame(
-                NSRect(x: f.minX, y: f.minY - f.height - 20, width: f.width, height: f.height),
-                display: true
-            )
+            ctx.duration = 0.36
+            ctx.timingFunction = Self.slideDownTiming
+            ctx.allowsImplicitAnimation = true
+            self.animator().alphaValue = 0
+            self.animator().setFrame(exitFrame, display: true)
         }, completionHandler: {
-            // The completion block runs on the main thread; assert isolation so Swift 6 allows
-            // calling @MainActor methods without an async hop.
-            MainActor.assumeIsolated { self.orderOut(nil) }
+            MainActor.assumeIsolated {
+                self.alphaValue = 1
+                self.orderOut(nil)
+            }
         })
     }
 

@@ -16,11 +16,12 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     private let clipViewModel: ClipViewModel
     private let notchLayoutGuide: NotchLayoutGuide
     nonisolated(unsafe) private var topInsetObserver: NSObjectProtocol?
-    private var previousApp: NSRunningApplication?
     private var localKeyMonitor: Any?
     private var hideTask: Task<Void, Never>?
     /// Ignores `windowDidResignKey` briefly after show so activation churn cannot instantly dismiss.
     private var suppressDismissUntil: Date?
+    /// Called after the panel becomes key — use to keep other Echo windows (e.g. Dashboard) in the background.
+    var onDidBecomeKey: (() -> Void)?
     private(set) var isShowing = false
 
     static let windowSize = CGSize(width: 860, height: 600)
@@ -30,7 +31,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         self.notchLayoutGuide = notchLayoutGuide
         super.init(
             contentRect: NSRect(origin: .zero, size: Self.windowSize),
-            styleMask: [.borderless, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -154,7 +155,6 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         hideTask?.cancel()
         hideTask = nil
 
-        previousApp = NSWorkspace.shared.frontmostApplication
         isShowing   = true
         suppressDismissUntil = Date().addingTimeInterval(0.5)
         viewModel.reset()          // resets isVisible=false, isExpanded=false
@@ -165,10 +165,12 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         orderFrontRegardless()
 
         // Present on the next turn so the window is on-screen before we become key.
+        // Spotlight-style: the nonactivating panel becomes key without activating
+        // Echo, so the user's frontmost app stays visually active underneath.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.isShowing else { return }
-            NSApp.activate(ignoringOtherApps: true)
             self.makeKeyAndOrderFront(nil)
+            self.onDidBecomeKey?()
 
             var transaction = Transaction(animation: .spring(response: 0.38, dampingFraction: 0.88))
             transaction.disablesAnimations = false
@@ -197,16 +199,13 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
         ignoresMouseEvents = true
         orderOut(nil)
-        previousApp?.activate(options: [])
-        previousApp = nil
     }
 
     func toggle() { isShowing ? hide() : show() }
 
-    /// Hide without restoring focus to `previousApp` — used when launching an app
-    /// so the launched app keeps focus instead of the prior app stealing it back.
+    /// Hide after launching an app. Since the panel never activates Echo,
+    /// no focus restoration is needed — the launched app takes focus naturally.
     func hideAfterLaunch() {
-        previousApp = nil
         hide()
     }
 

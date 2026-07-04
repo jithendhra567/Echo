@@ -86,6 +86,7 @@ actor ClipStore {
         return clips
     }
 
+    /// Pinned clips are never pruned.
     func prune() {
         guard let db else { return }
         let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL

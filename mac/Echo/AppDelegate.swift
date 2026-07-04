@@ -38,6 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherPanel.prewarm()
         launcherPanel.viewModel.warmTabsCache()
         launcherPanel.viewModel.onOpenDashboard = { [weak self] in self?.openDashboard() }
+        launcherPanel.onDidBecomeKey = { [weak self] in
+            // Spotlight-style search must not pull an open Dashboard window forward.
+            self?.dashboardWindow?.orderBack(nil)
+        }
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
         monitor.onNewClip   = { [weak self] _ in self?.viewModel.loadClips() }
@@ -120,9 +124,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Dashboard window
 
     @objc private func openDashboard() {
+        // Close the launcher first so it doesn't compete for key-window status.
+        if launcherPanel.isShowing { launcherPanel.hide() }
+
         if let w = dashboardWindow {
-            w.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            presentDashboard(w)
             return
         }
 
@@ -146,9 +152,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.contentView = NSHostingView(rootView: content)
         window.isReleasedWhenClosed = false
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         dashboardWindow = window
+        presentDashboard(window)
+    }
+
+    /// Activates Echo and brings the Dashboard to the front. Called only for an explicit Dashboard open.
+    private func presentDashboard(_ window: NSWindow) {
+        NSApp.activate(ignoringOtherApps: true)
+        window.orderFrontRegardless()
+        window.makeKey()
     }
 
     // MARK: - Global hotkeys (⌘⇧V clipboard panel + launcher hotkey + Escape)

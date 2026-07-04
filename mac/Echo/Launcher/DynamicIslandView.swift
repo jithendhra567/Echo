@@ -884,6 +884,7 @@ private struct AppResultRow: View {
 // MARK: - Clip result row
 
 private struct ClipResultRow: View {
+    @Environment(ClipViewModel.self) private var clipVM
     let clip: Clip
     let isSelected: Bool
     var isCopied: Bool = false
@@ -952,6 +953,22 @@ private struct ClipResultRow: View {
             }
 
             Spacer(minLength: 4)
+
+            // Pin: always shown when pinned; appears on hover to pin/unpin.
+            if isHovered || clip.isPinned {
+                Button {
+                    clipVM.pin(clip)
+                } label: {
+                    Image(systemName: clip.isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(clip.isPinned ? .orange : .white.opacity(0.50))
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(clip.isPinned ? "Unpin" : "Pin — pinned clips never expire")
+                .transition(.opacity)
+            }
 
             Text(clip.createdAt.relativeFormatted)
                 .font(.system(size: 11))

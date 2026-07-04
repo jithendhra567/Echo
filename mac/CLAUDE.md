@@ -95,6 +95,8 @@ Echo/
 │                                  #   nonisolated static readers for actor access
 ├── Dashboard/
 │   ├── DashboardView.swift        # NavigationSplitView: General / Clipboard / Privacy / Statistics / History / About
+│   ├── ClipHistoryPane.swift      # Row-based history list (pinned on top, hover pin/copy actions);
+│   │                              #   ClipRowCache caches previews/thumbnails/app icons for smooth scrolling
 │   └── StatsProvider.swift        # Aggregates stats: top websites (tab history + URL clips),
 │                                  #   most-launched apps (launcher usage), clipboard aggregations
 ├── Permissions/AccessibilityPermission.swift
@@ -131,7 +133,7 @@ NSWorkspace.didActivateApplication ──▶ LauncherViewModel.recordSystemActiv
 
 **Two `HotkeyManager` instances**: `AppDelegate` owns `hotkeyManager` (id 1, launcher) and `clipHotkeyManager` (id 2, clipboard panel). Both use Carbon hotkey registration. Escape is handled separately via `NSEvent.addGlobalMonitorForEvents`. Hotkeys are user-configurable and stored in `LauncherSettings` (UserDefaults).
 
-**`DynamicIslandWindow` as transparent passthrough**: baseline `ignoresMouseEvents = true`; hover-guard via `acceptsMouseMovedEvents` lifts on first mouse move so accidental-hover on show is suppressed. The island shape is drawn entirely in SwiftUI — the window frame never changes. Always uses `.darkAqua` appearance regardless of system theme.
+**`DynamicIslandWindow` as transparent passthrough**: baseline `ignoresMouseEvents = true`; hover-guard via `acceptsMouseMovedEvents` lifts on first mouse move so accidental-hover on show is suppressed. The island shape is drawn entirely in SwiftUI — the window frame never changes. Always uses `.darkAqua` appearance regardless of system theme. Uses `.nonactivatingPanel` (Spotlight-style): the panel becomes key for typing without activating Echo, so the user's frontmost app stays active underneath and no other Echo windows (e.g. Dashboard) are pulled forward.
 
 **`NotchPanel` click-through**: `ignoresMouseEvents = true` by default (OS-level guarantee — window server skips it). Toggled to `false` only when cursor enters the pill rect. A secondary `PillHostingView.hitTest` guard ensures transparent margins inside the open pill also pass through. Level is `.mainMenu + 3` so it sits above the menu bar.
 

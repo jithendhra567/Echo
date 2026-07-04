@@ -515,7 +515,6 @@ final class LauncherViewModel {
 
     func openDashboard() {
         onOpenDashboard?()
-        dismiss()
     }
 
     func expand() {

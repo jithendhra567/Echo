@@ -29,6 +29,7 @@ struct ClipCardView: View {
             if clip.supportsPlainTextCopy {
                 Button("Copy as Plain Text") { handlePlainTextCopy() }
             }
+            Button(clip.isPinned ? "Unpin" : "Pin") { viewModel.pin(clip) }
             Divider()
             Button("Delete", role: .destructive) { viewModel.delete(clip) }
         }
