@@ -4,7 +4,7 @@ import AppKit
 /// Runs entirely on the main actor (NSPasteboard and AX APIs are main-thread-only).
 @MainActor
 final class ClipboardMonitor {
-    var onNewClip: ((Clip) -> Void)?
+    var onNewClip: ((ClipStore.SaveResult) -> Void)?
 
     private let store: ClipStore
     private let settings: AppSettings
@@ -46,13 +46,26 @@ final class ClipboardMonitor {
         suppressNext = true
     }
 
+    /// Ignores pasteboard changes for a short window — used during drag sessions.
+    func suppressCaptures(for seconds: TimeInterval) {
+        suppressUntil = Date().addingTimeInterval(seconds)
+        lastChangeCount = NSPasteboard.general.changeCount
+    }
+
     // MARK: - Private
+
+    private var suppressUntil: Date?
 
     private func poll() {
         let pb = NSPasteboard.general
         let count = pb.changeCount
         guard count != lastChangeCount else { return }
         lastChangeCount = count
+
+        if let until = suppressUntil, Date() < until {
+            return
+        }
+        suppressUntil = nil
 
         if suppressNext {
             suppressNext = false
@@ -61,8 +74,10 @@ final class ClipboardMonitor {
 
         guard !settings.isClipboardPaused else { return }
         guard let clip = capture(from: pb) else { return }
-        Task { await store.save(clip) }
-        onNewClip?(clip)
+        Task { @MainActor in
+            let result = await store.save(clip)
+            onNewClip?(result)
+        }
     }
 
     private func capture(from pb: NSPasteboard) -> Clip? {
@@ -75,6 +90,11 @@ final class ClipboardMonitor {
         let meta = AppMetadataCapture.capture()
 
         if let bundle = meta.bundleIdentifier, settings.ignoredApps.contains(bundle) {
+            return nil
+        }
+
+        // Echo UI copies and drags manage history explicitly — never auto-capture here.
+        if let bundle = meta.bundleIdentifier, bundle == Bundle.main.bundleIdentifier {
             return nil
         }
 

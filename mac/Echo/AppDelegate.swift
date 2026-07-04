@@ -44,7 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
-        monitor.onNewClip   = { [weak self] _ in self?.viewModel.loadClips() }
+        monitor.onNewClip   = { [weak self] result in
+            self?.viewModel.handleNewClip(result)
+        }
 
         hotkeyManager.onFire = { [weak self] in self?.launcherPanel.toggle() }
         hotkeyManager.register(keyCode: launcherSettings.keyCode,
@@ -76,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchPanel = NotchPanel(layoutGuide: notchLayoutGuide)
         notchPanel.start()
 
-        viewModel.loadClips()
+        viewModel.loadPanelFirstPage()
         monitor.start()
         setupStatusBar()
         setupGlobalHotkey()

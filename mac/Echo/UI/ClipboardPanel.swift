@@ -42,10 +42,10 @@ private struct ClipboardPanelRoot: View {
 /// enabling seamless drag-and-drop out of the panel.
 final class ClipboardPanel: NSPanel {
     private(set) var isShowing = false
-    private var isOpening = false
     private var localKeyMonitor: Any?
+    private var scrollMonitor: Any?
+    private var dragMouseMonitor: Any?
     private var hideTask: DispatchWorkItem?
-    private var showTask: Task<Void, Never>?
     private let presentation = ClipboardPanelPresentation()
     private let viewModel: ClipViewModel
 
@@ -94,43 +94,36 @@ final class ClipboardPanel: NSPanel {
     // MARK: - Show / Hide
 
     func show() {
-        guard !isShowing, !isOpening, let screen = NSScreen.main else { return }
+        guard !isShowing, let screen = NSScreen.main else { return }
         hideTask?.cancel()
         hideTask = nil
-        showTask?.cancel()
 
-        isOpening = true
-        showTask = Task { @MainActor in
-            await viewModel.refreshClips()
-            guard !Task.isCancelled else {
-                isOpening = false
-                return
-            }
+        presentation.isPresented = false
+        setFrame(windowFrame(for: screen), display: true)
+        isShowing = true
+        orderFrontRegardless()
+        makeKey()
+        setupKeyMonitor()
+        setupScrollMonitor()
+        setupDragMouseMonitor()
 
-            presentation.isPresented = false
-            setFrame(windowFrame(for: screen), display: true)
-            isOpening = false
-            isShowing = true
-            orderFrontRegardless()
-            makeKey()
-            setupKeyMonitor()
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.isShowing else { return }
-                self.presentation.isPresented = true
-            }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShowing else { return }
+            self.presentation.isPresented = true
         }
+
+        // Load first page in the background — panel opens instantly with any cached clips.
+        viewModel.loadPanelFirstPage()
     }
 
     func hide() {
-        showTask?.cancel()
-        showTask = nil
-        isOpening = false
         guard isShowing else { return }
         hideTask?.cancel()
 
         isShowing = false
         tearDownKeyMonitor()
+        tearDownScrollMonitor()
+        tearDownDragMouseMonitor()
         presentation.isPresented = false
 
         let work = DispatchWorkItem { [weak self] in
@@ -141,9 +134,7 @@ final class ClipboardPanel: NSPanel {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32, execute: work)
     }
 
-    func toggle() {
-        if isShowing || isOpening { hide() } else { show() }
-    }
+    func toggle() { isShowing ? hide() : show() }
 
     // MARK: - Keyboard handling
 
@@ -160,6 +151,98 @@ final class ClipboardPanel: NSPanel {
 
     private func tearDownKeyMonitor() {
         if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
+    }
+
+    // MARK: - Vertical wheel → horizontal scroll
+
+    private func setupScrollMonitor() {
+        tearDownScrollMonitor()
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, self.isShowing else { return event }
+            return self.handleScrollWheel(event) ? nil : event
+        }
+    }
+
+    private func tearDownScrollMonitor() {
+        if let m = scrollMonitor { NSEvent.removeMonitor(m); scrollMonitor = nil }
+    }
+
+    /// Redirects vertical trackpad/wheel movement to the horizontal clip scroller.
+    private func handleScrollWheel(_ event: NSEvent) -> Bool {
+        guard let contentView else { return false }
+        let localPoint = contentView.convert(event.locationInWindow, from: nil)
+        guard contentView.bounds.contains(localPoint),
+              let hit = contentView.hitTest(localPoint),
+              !isTextInput(hit)
+        else { return false }
+
+        var view: NSView? = hit
+        while let current = view {
+            if let scrollView = current as? NSScrollView,
+               let doc = scrollView.documentView,
+               doc.frame.width > scrollView.contentView.bounds.width {
+                return scrollHorizontally(scrollView: scrollView, document: doc, event: event)
+            }
+            view = current.superview
+        }
+        return false
+    }
+
+    private func scrollHorizontally(scrollView: NSScrollView, document: NSView, event: NSEvent) -> Bool {
+        let vertical = event.hasPreciseScrollingDeltas
+            ? event.scrollingDeltaY
+            : CGFloat(event.deltaY) * 8
+        let horizontal = event.hasPreciseScrollingDeltas
+            ? event.scrollingDeltaX
+            : CGFloat(event.deltaX) * 8
+
+        // Prefer vertical delta mapped to horizontal; fall back to native horizontal.
+        let delta: CGFloat
+        if abs(vertical) >= abs(horizontal), abs(vertical) > 0.01 {
+            delta = -vertical
+        } else if abs(horizontal) > 0.01 {
+            delta = horizontal
+        } else {
+            return false
+        }
+
+        let clipView = scrollView.contentView
+        var origin = clipView.bounds.origin
+        origin.x += delta
+        let maxX = max(0, document.frame.width - clipView.bounds.width)
+        origin.x = min(max(origin.x, 0), maxX)
+        clipView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(clipView)
+        return true
+    }
+
+    private func isTextInput(_ view: NSView) -> Bool {
+        var current: NSView? = view
+        while let v = current {
+            if v is NSTextView || v is NSTextField { return true }
+            current = v.superview
+        }
+        return false
+    }
+
+    // MARK: - Clip drag (intercept before ScrollView)
+
+    private func setupDragMouseMonitor() {
+        tearDownDragMouseMonitor()
+        dragMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self, self.isShowing, event.window === self, let contentView else { return event }
+
+            let local = contentView.convert(event.locationInWindow, from: nil)
+            guard let hit = contentView.hitTest(local), !self.isTextInput(hit) else { return event }
+            guard let bridge = ClipCardMouseBridge.bridge(in: hit) else { return event }
+
+            bridge.handleMouseDown(event)
+            return nil
+        }
+    }
+
+    private func tearDownDragMouseMonitor() {
+        if let m = dragMouseMonitor { NSEvent.removeMonitor(m); dragMouseMonitor = nil }
     }
 
     override var canBecomeKey: Bool  { true  }

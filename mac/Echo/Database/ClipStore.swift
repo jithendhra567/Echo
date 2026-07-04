@@ -33,16 +33,19 @@ actor ClipStore {
 
     // MARK: - Public API
 
-    func save(_ clip: Clip) {
-        guard let db else { return }
+    enum SaveResult: Sendable {
+        case inserted
+        case duplicate(existingID: UUID)
+    }
+
+    @discardableResult
+    func save(_ clip: Clip) -> SaveResult {
+        guard let db else { return .inserted }
         let hash = contentHash(clip.contentData)
 
-        // Duplicate: bump timestamp so re-copied content floats to top, then skip insert.
-        prepare(db: db, sql: "UPDATE clips SET created_at = ? WHERE content_hash = ?;") { stmt in
-            sqlite3_bind_double(stmt, 1, clip.createdAt.timeIntervalSince1970)
-            bindText(stmt, 2, hash)
+        if let existingID = idForContentHash(hash) {
+            return .duplicate(existingID: existingID)
         }
-        guard sqlite3_changes(db) == 0 else { return }
 
         let sql = """
             INSERT OR IGNORE INTO clips
@@ -62,9 +65,25 @@ actor ClipStore {
             sqlite3_bind_int(stmt, 9, clip.isPinned ? 1 : 0)
         }
         prune()
+        return .inserted
     }
 
-    func fetchRecent() -> [Clip] {
+    func idForContentHash(_ hash: String) -> UUID? {
+        guard let db else { return nil }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT id FROM clips WHERE content_hash = ? LIMIT 1;", -1, &stmt, nil) == SQLITE_OK
+        else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, hash)
+        guard sqlite3_step(stmt) == SQLITE_ROW,
+              let idStr = columnText(stmt, 0),
+              let id = UUID(uuidString: idStr)
+        else { return nil }
+        return id
+    }
+
+    func fetchRecent(limit: Int? = nil) -> [Clip] {
+        if let limit { return fetchPage(offset: 0, limit: limit) }
         prune()
         guard let db else { return [] }
         let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
@@ -80,6 +99,31 @@ actor ClipStore {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_double(stmt, 1, cutoff)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let clip = parseRow(stmt) { clips.append(clip) }
+        }
+        return clips
+    }
+
+    func fetchPage(offset: Int, limit: Int) -> [Clip] {
+        prune()
+        guard let db, limit > 0, offset >= 0 else { return [] }
+        let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
+        let sql = """
+            SELECT id, content_data, content_type, source_app_bundle,
+                   source_app_name, window_title, created_at, is_pinned
+            FROM clips
+            WHERE is_pinned = 1 OR created_at >= ?
+            ORDER BY is_pinned DESC, created_at DESC
+            LIMIT ? OFFSET ?;
+        """
+        var clips: [Clip] = []
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_double(stmt, 1, cutoff)
+        sqlite3_bind_int(stmt, 2, Int32(limit))
+        sqlite3_bind_int(stmt, 3, Int32(offset))
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let clip = parseRow(stmt) { clips.append(clip) }
         }
@@ -115,6 +159,15 @@ actor ClipStore {
         guard let db else { return }
         prepare(db: db, sql: "UPDATE clips SET is_pinned = ? WHERE id = ?;") { stmt in
             sqlite3_bind_int(stmt, 1, pinned ? 1 : 0)
+            bindText(stmt, 2, id.uuidString)
+        }
+    }
+
+    /// Moves an existing clip to the top of recency-sorted lists.
+    func bumpTimestamp(id: UUID, to date: Date = Date()) {
+        guard let db else { return }
+        prepare(db: db, sql: "UPDATE clips SET created_at = ? WHERE id = ?;") { stmt in
+            sqlite3_bind_double(stmt, 1, date.timeIntervalSince1970)
             bindText(stmt, 2, id.uuidString)
         }
     }

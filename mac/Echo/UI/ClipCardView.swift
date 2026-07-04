@@ -21,9 +21,10 @@ struct ClipCardView: View {
             if isCopied { copiedOverlay }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isHovered)
-        .onHover { isHovered = $0 }
-        .onTapGesture { handleTap() }
-        .onDrag { clip.itemProvider }
+        .overlay {
+            ClipCardMouseBridge(clip: clip, viewModel: viewModel, onTap: handleTap, isHovered: $isHovered)
+                .frame(width: 175, height: 185)
+        }
         .contextMenu {
             Button("Copy") { handleTap() }
             if clip.supportsPlainTextCopy {

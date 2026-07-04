@@ -5,6 +5,11 @@ import Observation
 @MainActor
 final class ClipViewModel {
     var clips: [Clip] = []
+    var hasMorePanelClips = true
+    var isLoadingPanelPage = false
+
+    static let panelPageSize = 24
+    static let newClipSortDelay: Duration = .seconds(2)
 
     private static let pastePlainTextOnlyKey = "echo_clipboard_paste_plain_text_only"
 
@@ -18,6 +23,9 @@ final class ClipViewModel {
 
     private let store: ClipStore
     private let monitor: ClipboardMonitor
+    private var panelLoadTask: Task<Void, Never>?
+    private var sortRefreshTask: Task<Void, Never>?
+    private var pendingSortBumps: Set<UUID> = []
 
     init(store: ClipStore, monitor: ClipboardMonitor) {
         self.store = store
@@ -27,13 +35,90 @@ final class ClipViewModel {
 
     // MARK: - Data
 
-    func loadClips() {
-        Task { await refreshClips() }
+    /// Loads the full clip list (Dashboard history, etc.).
+    func loadClips(limit: Int? = nil) {
+        cancelScheduledSortRefresh()
+        panelLoadTask?.cancel()
+        Task {
+            clips = await store.fetchRecent(limit: limit)
+            hasMorePanelClips = false
+            isLoadingPanelPage = false
+        }
     }
 
-    /// Fetches the latest clips and waits until they are in memory.
-    func refreshClips() async {
-        clips = await store.fetchRecent()
+    /// Resets and loads the first page for the floating clipboard panel.
+    func loadPanelFirstPage() {
+        cancelScheduledSortRefresh()
+        panelLoadTask?.cancel()
+        isLoadingPanelPage = true
+        panelLoadTask = Task {
+            let page = await store.fetchPage(offset: 0, limit: Self.panelPageSize)
+            guard !Task.isCancelled else { return }
+            clips = page
+            hasMorePanelClips = page.count == Self.panelPageSize
+            isLoadingPanelPage = false
+        }
+    }
+
+    /// Appends the next page when the user scrolls to the end of the panel list.
+    func loadNextPanelPage() {
+        guard hasMorePanelClips, !isLoadingPanelPage else { return }
+        panelLoadTask?.cancel()
+        isLoadingPanelPage = true
+        let offset = clips.count
+        panelLoadTask = Task {
+            let page = await store.fetchPage(offset: offset, limit: Self.panelPageSize)
+            guard !Task.isCancelled else { return }
+            let existing = Set(clips.map(\.id))
+            clips.append(contentsOf: page.filter { !existing.contains($0.id) })
+            hasMorePanelClips = page.count == Self.panelPageSize
+            isLoadingPanelPage = false
+        }
+    }
+
+    /// Schedules a sort refresh after a short delay when a clip is captured or re-copied.
+    func handleNewClip(_ result: ClipStore.SaveResult) {
+        if case .duplicate(let id) = result {
+            pendingSortBumps.insert(id)
+        }
+        scheduleClipsSortRefresh()
+    }
+
+    private func cancelScheduledSortRefresh() {
+        sortRefreshTask?.cancel()
+        sortRefreshTask = nil
+        pendingSortBumps.removeAll()
+    }
+
+    private func scheduleClipsSortRefresh() {
+        sortRefreshTask?.cancel()
+        sortRefreshTask = Task {
+            try? await Task.sleep(for: Self.newClipSortDelay)
+            guard !Task.isCancelled else { return }
+
+            let now = Date()
+            for id in pendingSortBumps {
+                await store.bumpTimestamp(id: id, to: now)
+            }
+            pendingSortBumps.removeAll()
+
+            let limit = max(Self.panelPageSize, clips.count)
+            let refreshed = await store.fetchPage(offset: 0, limit: limit)
+            guard !Task.isCancelled else { return }
+            clips = refreshed
+            hasMorePanelClips = refreshed.count == limit
+            isLoadingPanelPage = false
+        }
+    }
+
+    /// Suppresses pasteboard capture during an external drag session.
+    func prepareExternalDrag(for seconds: TimeInterval = 3) {
+        monitor.suppressCaptures(for: seconds)
+    }
+
+    private func bumpClipToTop(_ clip: Clip) {
+        pendingSortBumps.insert(clip.id)
+        scheduleClipsSortRefresh()
     }
 
     // MARK: - Actions
@@ -83,6 +168,7 @@ final class ClipViewModel {
         case .image:
             if let img = clip.image { pb.writeObjects([img]) }
         }
+        bumpClipToTop(clip)
     }
 
     /// Writes only `public.plain-text` — no RTF, images, or URL objects.
@@ -93,6 +179,7 @@ final class ClipViewModel {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         copyPlainTextSuppressingCapture(trimmed)
+        bumpClipToTop(clip)
     }
 
     func delete(_ clip: Clip) {

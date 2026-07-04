@@ -75,7 +75,7 @@ struct ClipDashboardView: View {
                 .frame(maxWidth: 220)
             }
 
-            // Search field
+            // Search field — text can be dragged out without recording a new clip.
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -84,6 +84,7 @@ struct ClipDashboardView: View {
                 TextField("Search clips…", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .textSelection(.enabled)
 
                 if !searchText.isEmpty {
                     Button { searchText = "" } label: {
@@ -101,6 +102,11 @@ struct ClipDashboardView: View {
                     .fill(Color.secondary.opacity(0.10))
             )
             .frame(maxWidth: .infinity)
+            .onDrag {
+                guard !searchText.isEmpty else { return NSItemProvider() }
+                viewModel.prepareExternalDrag(for: 2)
+                return NSItemProvider(object: searchText as NSString)
+            }
 
             PlainTextPasteToggle(style: .panel)
                 .fixedSize()
@@ -141,6 +147,9 @@ struct ClipDashboardView: View {
                         ForEach(filteredClips) { clip in
                             ClipCardView(clip: clip)
                         }
+                        if canLoadMorePages {
+                            paginationTail
+                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -148,6 +157,23 @@ struct ClipDashboardView: View {
             }
         }
         .frame(height: 205)
+    }
+
+    private var canLoadMorePages: Bool {
+        searchText.isEmpty && selectedTag == .all && viewModel.hasMorePanelClips
+    }
+
+    private var paginationTail: some View {
+        Group {
+            if viewModel.isLoadingPanelPage {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 48, height: 185)
+        .onAppear { viewModel.loadNextPanelPage() }
     }
 }
 

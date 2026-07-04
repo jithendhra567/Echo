@@ -16,7 +16,7 @@ struct ClipboardHistoryPane: View {
             .navigationTitle("History")
             .searchable(text: $searchText, prompt: "Search clips")
             .toolbar { toolbarContent }
-            .onAppear { clipVM.loadClips() }
+            .onAppear { clipVM.loadClips(limit: nil) }
             .confirmationDialog("Clear all unpinned clips?",
                                 isPresented: $showClearConfirm, titleVisibility: .visible) {
                 Button("Clear Unpinned Clips", role: .destructive) {
@@ -73,7 +73,7 @@ struct ClipboardHistoryPane: View {
             .pickerStyle(.menu)
         }
         ToolbarItem(placement: .automatic) {
-            Button { clipVM.loadClips() } label: {
+            Button { clipVM.loadClips(limit: nil) } label: {
                 Image(systemName: "arrow.clockwise")
             }
             .help("Refresh")

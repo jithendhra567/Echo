@@ -28,6 +28,19 @@ struct Clip: Identifiable, Sendable {
     let createdAt: Date
     var isPinned: Bool
 
+    func withCreatedAt(_ date: Date) -> Clip {
+        Clip(
+            id: id,
+            contentData: contentData,
+            contentType: contentType,
+            sourceAppBundle: sourceAppBundle,
+            sourceAppName: sourceAppName,
+            windowTitle: windowTitle,
+            createdAt: date,
+            isPinned: isPinned
+        )
+    }
+
     // MARK: - Derived content
 
     var plainText: String? {
