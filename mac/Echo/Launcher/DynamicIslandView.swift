@@ -53,26 +53,26 @@ struct DynamicIslandView: View {
     }
 
     private var islandScale: CGFloat {
-        guard vm.isVisible else { return 0.93 }
+        guard vm.isVisible else { return 0.90 }
         if vm.isInstantSearchOpen { return instantSearchScale }
         return 1.0
     }
 
-    /// 3D tilt used on open/close — leans back when hidden, settles flat when visible.
+    /// 3D tilt used on open — leans back when hidden, settles flat when visible.
     private var islandTiltDegrees: Double {
-        vm.isVisible ? 0 : -10
+        vm.isVisible ? 0 : -14
     }
 
-    /// 2D skew + slight vertical shift for a card-like open/close.
+    /// 2D skew + slight vertical shift for a card-like open.
     private var islandSkewTransform: CGAffineTransform {
         guard vm.isVisible else {
-            return CGAffineTransform(a: 0.95, b: 0, c: -0.065, d: 0.93, tx: 0, ty: -8)
+            return CGAffineTransform(a: 0.92, b: 0, c: -0.095, d: 0.90, tx: 0, ty: -12)
         }
         return .identity
     }
 
     private var islandVerticalOffset: CGFloat {
-        vm.isVisible ? 0 : -10
+        vm.isVisible ? 0 : -14
     }
 
     /// Always scale from the geometric center of the island so the open
@@ -140,9 +140,9 @@ struct DynamicIslandView: View {
         .offset(y: islandVerticalOffset)
         .rotation3DEffect(
             .degrees(islandTiltDegrees),
-            axis: (x: 1, y: -0.14, z: 0),
+            axis: (x: 1, y: -0.18, z: 0),
             anchor: islandScaleAnchor,
-            perspective: 0.58
+            perspective: 0.52
         )
         .transformEffect(islandSkewTransform)
         .scaleEffect(islandScale, anchor: islandScaleAnchor)
