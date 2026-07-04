@@ -282,9 +282,14 @@ struct DynamicIslandView: View {
             Button {
                 vm.openDashboard()
             } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.38))
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(.white.opacity(0.12))
+                    )
             }
             .buttonStyle(.plain)
             .help("Open Dashboard")
@@ -902,6 +907,9 @@ private struct ClipResultRow: View {
     }
 
     private var previewText: String {
+        if clip.isLink, let title = clip.linkTitle, !title.isEmpty {
+            return title
+        }
         let raw: String
         switch clip.contentType {
         case .plainText, .url:
@@ -917,26 +925,14 @@ private struct ClipResultRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            if let hex = clip.hexColor {
-                HexColorSwatch(color: hex)
-                    .frame(width: 22, height: 22)
-            } else if let appIcon = cachedAppIcon {
-                Image(nsImage: appIcon)
-                    .resizable()
-                    .frame(width: 22, height: 22)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            } else {
-                Image(systemName: fallbackIconName)
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(width: 22, height: 22)
-            }
+            leadingIcon
 
             if isCopied {
                 Label("Copied", systemImage: "checkmark")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.green.opacity(0.85))
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
-            } else if clip.hexColor != nil {
+            } else if clip.parsedColor != nil {
                 Text(previewText)
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .lineLimit(1)
@@ -970,6 +966,10 @@ private struct ClipResultRow: View {
                 .transition(.opacity)
             }
 
+            if showsTypeTag {
+                trailingTypeTag
+            }
+
             Text(clip.createdAt.relativeFormatted)
                 .font(.system(size: 11))
                 .foregroundColor(isCopied ? .green.opacity(0.55) : .white.opacity(0.35))
@@ -990,12 +990,91 @@ private struct ClipResultRow: View {
         .animation(.spring(response: 0.20, dampingFraction: 0.78), value: isSelected || isHovered)
     }
 
+    // MARK: - Leading icon + type tag
+
+    @ViewBuilder
+    private var leadingIcon: some View {
+        if let appIcon = cachedAppIcon {
+            Image(nsImage: appIcon)
+                .resizable()
+                .frame(width: 22, height: 22)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        } else if let color = clip.parsedColor {
+            colorCircle(size: 22)
+        } else if showsTypeTag {
+            standaloneTypeBadge
+        } else {
+            Image(systemName: fallbackIconName)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 22, height: 22)
+        }
+    }
+
+    private var showsTypeTag: Bool {
+        clip.parsedColor != nil || clip.autoTag == .link || clip.autoTag == .code
+    }
+
+    @ViewBuilder
+    private var trailingTypeTag: some View {
+        Group {
+            if clip.parsedColor != nil {
+                colorCircle(size: 14)
+            } else if clip.autoTag == .link {
+                tagGlyph("link", tint: .blue, size: 14, symbolSize: 7)
+            } else if clip.autoTag == .code {
+                tagGlyph("chevron.left.forwardslash.chevron.right",
+                         tint: Color(red: 0.55, green: 0.35, blue: 0.95),
+                         size: 14, symbolSize: 6)
+            }
+        }
+        .fixedSize()
+    }
+
+    private var standaloneTypeBadge: some View {
+        Group {
+            if clip.autoTag == .link {
+                tagGlyph("link", tint: .blue, size: 22, symbolSize: 10)
+            } else {
+                tagGlyph("chevron.left.forwardslash.chevron.right",
+                         tint: Color(red: 0.55, green: 0.35, blue: 0.95),
+                         size: 22, symbolSize: 9)
+            }
+        }
+    }
+
+    private func tagGlyph(
+        _ symbol: String,
+        tint: Color,
+        size: CGFloat = 10,
+        symbolSize: CGFloat = 5.5
+    ) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: symbolSize, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(Circle().fill(tint.opacity(0.85)))
+            .overlay(Circle().stroke(Color.black.opacity(0.30), lineWidth: 0.8))
+    }
+
+    private func colorCircle(size: CGFloat) -> some View {
+        let color = clip.parsedColor ?? .gray
+        let isLight = color.perceivedBrightness > 0.78
+        return Circle()
+            .fill(Color(nsColor: color))
+            .frame(width: size, height: size)
+            .overlay {
+                Circle()
+                    .stroke(Color.white.opacity(isLight ? 0.28 : 0.18), lineWidth: 0.6)
+            }
+    }
+
     private var fallbackIconName: String {
-        switch clip.contentType {
-        case .plainText: return "doc.text.fill"
-        case .richText:  return "doc.richtext.fill"
-        case .url:       return "link"
-        case .image:     return "photo.fill"
+        switch clip.autoTag {
+        case .color:    return "paintpalette.fill"
+        case .image:    return "photo.fill"
+        case .richText: return "doc.richtext.fill"
+        case .code:     return "chevron.left.forwardslash.chevron.right"
+        default:        return "doc.text.fill"
         }
     }
 }

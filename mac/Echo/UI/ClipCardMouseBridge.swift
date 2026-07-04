@@ -7,15 +7,28 @@ struct ClipCardMouseBridge: NSViewRepresentable {
     let viewModel: ClipViewModel
     let onTap: () -> Void
     @Binding var isHovered: Bool
+    @Binding var isDragging: Bool
 
     func makeNSView(context: Context) -> BridgeView {
         let view = BridgeView(frame: NSRect(x: 0, y: 0, width: 175, height: 185))
-        view.apply(clip: clip, viewModel: viewModel, onTap: onTap, isHovered: $isHovered)
+        view.apply(
+            clip: clip,
+            viewModel: viewModel,
+            onTap: onTap,
+            isHovered: $isHovered,
+            isDragging: $isDragging
+        )
         return view
     }
 
     func updateNSView(_ nsView: BridgeView, context: Context) {
-        nsView.apply(clip: clip, viewModel: viewModel, onTap: onTap, isHovered: $isHovered)
+        nsView.apply(
+            clip: clip,
+            viewModel: viewModel,
+            onTap: onTap,
+            isHovered: $isHovered,
+            isDragging: $isDragging
+        )
     }
 
     /// AppKit drag source overlaid on each clip card.
@@ -24,6 +37,7 @@ struct ClipCardMouseBridge: NSViewRepresentable {
         private var viewModel: ClipViewModel?
         private var onTap: (() -> Void)?
         private var isHoveredBinding: Binding<Bool>?
+        private var isDraggingBinding: Binding<Bool>?
         private var tracking: NSTrackingArea?
 
         private static let dragThreshold: CGFloat = 3
@@ -33,12 +47,14 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             clip: Clip,
             viewModel: ClipViewModel,
             onTap: @escaping () -> Void,
-            isHovered: Binding<Bool>
+            isHovered: Binding<Bool>,
+            isDragging: Binding<Bool>
         ) {
             self.clip = clip
             self.viewModel = viewModel
             self.onTap = onTap
             isHoveredBinding = isHovered
+            isDraggingBinding = isDragging
         }
 
         override var acceptsFirstResponder: Bool { true }
@@ -107,10 +123,18 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             guard let clip, let viewModel else { return }
             viewModel.prepareExternalDrag(for: 3)
 
+            let preview = dragPreviewImage(for: clip)
+            let size = preview?.size ?? bounds.size
             let item = NSDraggingItem(pasteboardWriter: pasteboardWriter(for: clip))
-            item.draggingFrame = convert(bounds, to: nil)
+            item.setDraggingFrame(
+                NSRect(x: -(size.width / 2), y: -(size.height / 2),
+                       width: size.width, height: size.height),
+                contents: preview
+            )
 
-            _ = beginDraggingSession(with: [item], event: event, source: self)
+            isDraggingBinding?.wrappedValue = true
+            let session = beginDraggingSession(with: [item], event: event, source: self)
+            session.animatesToStartingPositionsOnCancelOrFail = true
         }
 
         func draggingSession(
@@ -118,8 +142,80 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             endedAt screenPoint: NSPoint,
             operation: NSDragOperation
         ) {
-            guard operation != [] else { return }
+            if operation == [] {
+                isDraggingBinding?.wrappedValue = false
+                return
+            }
             Task { @MainActor in viewModel?.dismiss() }
+        }
+
+        /// Snapshots the rendered card; falls back to a lightweight content preview.
+        private func dragPreviewImage(for clip: Clip) -> NSImage? {
+            if let snapshot = snapshotCardView() { return snapshot }
+            return fallbackDragPreview(for: clip)
+        }
+
+        private func snapshotCardView() -> NSImage? {
+            guard let cardView = cardContainerView() else { return nil }
+            let bounds = cardView.bounds
+            guard bounds.width > 1, bounds.height > 1,
+                  let rep = cardView.bitmapImageRepForCachingDisplay(in: bounds)
+            else { return nil }
+            cardView.cacheDisplay(in: bounds, to: rep)
+            let image = NSImage(size: bounds.size)
+            image.addRepresentation(rep)
+            return image
+        }
+
+        /// Walks up from the bridge overlay to the full card-sized hosting view.
+        private func cardContainerView() -> NSView? {
+            var current: NSView? = superview
+            while let view = current {
+                let size = view.bounds.size
+                if abs(size.width - 175) < 4, abs(size.height - 185) < 4 {
+                    return view
+                }
+                current = view.superview
+            }
+            return superview
+        }
+
+        private func fallbackDragPreview(for clip: Clip) -> NSImage {
+            let size = NSSize(width: 175, height: 185)
+            let image = NSImage(size: size)
+            image.lockFocus()
+            defer { image.unlockFocus() }
+
+            let bg = NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 12, yRadius: 12)
+            NSColor.windowBackgroundColor.setFill()
+            bg.fill()
+
+            switch clip.contentType {
+            case .image:
+                if let img = clip.image {
+                    let aspect = img.size.width / max(img.size.height, 1)
+                    var draw = NSRect(origin: .zero, size: size)
+                    if aspect > size.width / size.height {
+                        draw.size.height = size.width / aspect
+                        draw.origin.y = (size.height - draw.height) / 2
+                    } else {
+                        draw.size.width = size.height * aspect
+                        draw.origin.x = (size.width - draw.width) / 2
+                    }
+                    img.draw(in: draw)
+                }
+            case .plainText, .url, .richText:
+                let text = (clip.resolvedPlainText ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: 12),
+                    .foregroundColor: NSColor.labelColor,
+                ]
+                let inset = NSRect(x: 12, y: 12, width: size.width - 24, height: size.height - 24)
+                (text as NSString).draw(with: inset, options: [.truncatesLastVisibleLine, .usesLineFragmentOrigin], attributes: attrs)
+            }
+
+            return image
         }
 
         private func pasteboardWriter(for clip: Clip) -> NSPasteboardWriting {

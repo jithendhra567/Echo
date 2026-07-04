@@ -4,7 +4,7 @@ import AppKit
 /// Runs entirely on the main actor (NSPasteboard and AX APIs are main-thread-only).
 @MainActor
 final class ClipboardMonitor {
-    var onNewClip: ((ClipStore.SaveResult) -> Void)?
+    var onNewClip: ((Clip, ClipStore.SaveResult) -> Void)?
 
     private let store: ClipStore
     private let settings: AppSettings
@@ -76,7 +76,7 @@ final class ClipboardMonitor {
         guard let clip = capture(from: pb) else { return }
         Task { @MainActor in
             let result = await store.save(clip)
-            onNewClip?(result)
+            onNewClip?(clip, result)
         }
     }
 
@@ -104,9 +104,12 @@ final class ClipboardMonitor {
         }
 
         if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL],
-           let url = urls.first, url.scheme != nil,
-           let data = url.absoluteString.data(using: .utf8) {
-            guard !AppSettings.isWebsiteIgnored(url.absoluteString) else { return nil }
+           let url = urls.first, url.scheme != nil {
+            let trimmed = url.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let data = trimmed.data(using: .utf8)
+            else { return nil }
+            guard !AppSettings.isWebsiteIgnored(trimmed) else { return nil }
             return makeClip(data: data, type: .url, meta: meta)
         }
 
@@ -114,11 +117,14 @@ final class ClipboardMonitor {
             return makeClip(data: rtf, type: .richText, meta: meta)
         }
 
-        if let text = pb.string(forType: .string), !text.isEmpty,
-           let data = text.data(using: .utf8) {
-            // Plain-text copies of an ignored site's URL are skipped too.
-            if AppSettings.isWebsiteIgnored(text) { return nil }
-            return makeClip(data: data, type: .plainText, meta: meta)
+        if let text = pb.string(forType: .string) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let data = trimmed.data(using: .utf8)
+            else { return nil }
+            if AppSettings.isWebsiteIgnored(trimmed) { return nil }
+            let type: ClipContentType = AppSettings.host(of: trimmed) != nil ? .url : .plainText
+            return makeClip(data: data, type: type, meta: meta)
         }
 
         return nil

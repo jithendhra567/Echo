@@ -58,7 +58,7 @@ final class StatsProvider {
                 counts[domain, default: 0] += 1
             }
         }
-        for clip in clips where clip.contentType == .url {
+        for clip in clips where clip.isLink {
             if let text = clip.plainText, let domain = Self.displayDomain(of: text) {
                 counts[domain, default: 0] += 1
             }

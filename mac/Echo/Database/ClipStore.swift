@@ -89,7 +89,8 @@ actor ClipStore {
         let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
         let sql = """
             SELECT id, content_data, content_type, source_app_bundle,
-                   source_app_name, window_title, created_at, is_pinned
+                   source_app_name, window_title, created_at, is_pinned,
+                   link_title, link_image, link_favicon
             FROM clips
             WHERE is_pinned = 1 OR created_at >= ?
             ORDER BY is_pinned DESC, created_at DESC;
@@ -111,7 +112,8 @@ actor ClipStore {
         let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
         let sql = """
             SELECT id, content_data, content_type, source_app_bundle,
-                   source_app_name, window_title, created_at, is_pinned
+                   source_app_name, window_title, created_at, is_pinned,
+                   link_title, link_image, link_favicon
             FROM clips
             WHERE is_pinned = 1 OR created_at >= ?
             ORDER BY is_pinned DESC, created_at DESC
@@ -172,6 +174,26 @@ actor ClipStore {
         }
     }
 
+    func updateLinkMetadata(
+        id: UUID,
+        title: String?,
+        imageData: Data?,
+        faviconData: Data?
+    ) {
+        guard let db else { return }
+        let sql = """
+            UPDATE clips
+            SET link_title = ?, link_image = ?, link_favicon = ?
+            WHERE id = ?;
+        """
+        prepare(db: db, sql: sql) { stmt in
+            bindText(stmt, 1, title)
+            bindBlobOrNull(stmt, 2, imageData)
+            bindBlobOrNull(stmt, 3, faviconData)
+            bindText(stmt, 4, id.uuidString)
+        }
+    }
+
     // MARK: - Schema (nonisolated so it can be called from init)
 
     nonisolated private func createSchema() {
@@ -194,6 +216,9 @@ actor ClipStore {
         sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;", nil, nil, nil)
         sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN content_hash TEXT;", nil, nil, nil)
         sqlite3_exec(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_clips_hash ON clips (content_hash);", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN link_title TEXT;", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN link_image BLOB;", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN link_favicon BLOB;", nil, nil, nil)
     }
 
     // MARK: - Row parsing
@@ -215,7 +240,10 @@ actor ClipStore {
             sourceAppName:   columnText(stmt, 4),
             windowTitle:     columnText(stmt, 5),
             createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 6)),
-            isPinned: sqlite3_column_int(stmt, 7) != 0
+            isPinned: sqlite3_column_int(stmt, 7) != 0,
+            linkTitle: columnText(stmt, 8),
+            linkImageData: columnBlob(stmt, 9),
+            linkFaviconData: columnBlob(stmt, 10)
         )
     }
 
@@ -246,6 +274,22 @@ actor ClipStore {
             sqlite3_bind_blob(stmt, idx, ptr.baseAddress, Int32(data.count),
                               unsafeBitCast(-1 as Int, to: sqlite3_destructor_type.self))
         }
+    }
+
+    private func bindBlobOrNull(_ stmt: OpaquePointer?, _ idx: Int32, _ data: Data?) {
+        guard let stmt else { return }
+        if let data {
+            bindBlob(stmt, idx, data)
+        } else {
+            sqlite3_bind_null(stmt, idx)
+        }
+    }
+
+    private func columnBlob(_ stmt: OpaquePointer?, _ idx: Int32) -> Data? {
+        guard let ptr = sqlite3_column_blob(stmt, idx) else { return nil }
+        let count = Int(sqlite3_column_bytes(stmt, idx))
+        guard count > 0 else { return nil }
+        return Data(bytes: ptr, count: count)
     }
 
     private func columnText(_ stmt: OpaquePointer?, _ idx: Int32) -> String? {

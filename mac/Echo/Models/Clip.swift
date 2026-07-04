@@ -12,7 +12,8 @@ enum ClipContentType: String, Codable, Sendable {
 enum ClipTag: String, CaseIterable, Sendable {
     case all      = "All"
     case text     = "Text"
-    case url      = "URL"
+    case link     = "Links"
+    case color    = "Colors"
     case image    = "Image"
     case richText = "Rich Text"
     case code     = "Code"
@@ -27,6 +28,9 @@ struct Clip: Identifiable, Sendable {
     let windowTitle: String?
     let createdAt: Date
     var isPinned: Bool
+    var linkTitle: String?
+    var linkImageData: Data?
+    var linkFaviconData: Data?
 
     func withCreatedAt(_ date: Date) -> Clip {
         Clip(
@@ -37,7 +41,26 @@ struct Clip: Identifiable, Sendable {
             sourceAppName: sourceAppName,
             windowTitle: windowTitle,
             createdAt: date,
-            isPinned: isPinned
+            isPinned: isPinned,
+            linkTitle: linkTitle,
+            linkImageData: linkImageData,
+            linkFaviconData: linkFaviconData
+        )
+    }
+
+    func withLinkMetadata(title: String?, imageData: Data?, faviconData: Data?) -> Clip {
+        Clip(
+            id: id,
+            contentData: contentData,
+            contentType: contentType,
+            sourceAppBundle: sourceAppBundle,
+            sourceAppName: sourceAppName,
+            windowTitle: windowTitle,
+            createdAt: createdAt,
+            isPinned: isPinned,
+            linkTitle: title ?? linkTitle,
+            linkImageData: imageData ?? linkImageData,
+            linkFaviconData: faviconData ?? linkFaviconData
         )
     }
 
@@ -115,10 +138,43 @@ extension Clip {
         switch contentType {
         case .image:    return .image
         case .richText: return .richText
-        case .url:      return .url
+        case .url:      return .link
         case .plainText:
+            if parsedColor != nil { return .color }
+            if isLink { return .link }
             return looksLikeCode ? .code : .text
         }
+    }
+
+    var isLink: Bool {
+        contentType == .url || looksLikeLink
+    }
+
+    var linkURLString: String? {
+        guard isLink,
+              let text = resolvedPlainText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty
+        else { return nil }
+        return text
+    }
+
+    var linkImage: NSImage? {
+        guard let data = linkImageData else { return nil }
+        return NSImage(data: data)
+    }
+
+    var linkFavicon: NSImage? {
+        guard let data = linkFaviconData else { return nil }
+        return NSImage(data: data)
+    }
+
+    var needsLinkMetadata: Bool {
+        isLink && linkTitle == nil && linkImageData == nil && linkFaviconData == nil
+    }
+
+    private var looksLikeLink: Bool {
+        guard let text = plainText else { return false }
+        return AppSettings.host(of: text) != nil
     }
 
     private var looksLikeCode: Bool {
@@ -130,9 +186,15 @@ extension Clip {
     }
 }
 
-// MARK: - Hex color detection
+// MARK: - Color detection
 
 extension Clip {
+    /// Parsed CSS color — hex, `rgb()`, `rgba()`, `hsl()`, `hsla()`.
+    var parsedColor: NSColor? {
+        guard let raw = resolvedPlainText else { return nil }
+        return NSColor.parsingCSSColor(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     /// Returns the parsed color when the trimmed plain-text payload is a
     /// CSS-style hex literal. Accepts `RRGGBB` / `RRGGBBAA` with or without
     /// a leading `#`, and `RGB` only when prefixed with `#` (bare three-letter
@@ -140,6 +202,14 @@ extension Clip {
     var hexColor: NSColor? {
         guard let raw = resolvedPlainText else { return nil }
         return NSColor.parsingHex(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Display string for color clips — canonical hex when applicable, else the original code.
+    var colorDisplayString: String? {
+        guard parsedColor != nil,
+              let raw = resolvedPlainText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        return hexColorDisplayString ?? raw
     }
 
     /// Canonical `#RRGGBB(AA)` form for display, regardless of the user's input
@@ -159,6 +229,14 @@ extension Clip {
 }
 
 extension NSColor {
+    /// Parse common CSS color literals into sRGB.
+    static func parsingCSSColor(_ string: String) -> NSColor? {
+        if let hex = parsingHex(string) { return hex }
+        if let rgb = parsingRGBFunction(string) { return rgb }
+        if let hsl = parsingHSLFunction(string) { return hsl }
+        return nil
+    }
+
     /// Parse a CSS-style hex string into an sRGB color. Returns nil unless the
     /// *entire* input is a valid hex literal.
     static func parsingHex(_ string: String) -> NSColor? {
@@ -184,6 +262,115 @@ extension NSColor {
         let b = CGFloat((value >>  8) & 0xff) / 255
         let a = CGFloat( value        & 0xff) / 255
         return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    private static func parsingRGBFunction(_ string: String) -> NSColor? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.hasPrefix("rgb") else { return nil }
+        guard let open = trimmed.firstIndex(of: "("),
+              trimmed.hasSuffix(")")
+        else { return nil }
+        let inner = trimmed[trimmed.index(after: open)..<trimmed.index(before: trimmed.endIndex)]
+        let parts = inner.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let hasAlpha = trimmed.hasPrefix("rgba")
+        guard parts.count == (hasAlpha ? 4 : 3) else { return nil }
+
+        guard let r = parseColorComponent(parts[0]),
+              let g = parseColorComponent(parts[1]),
+              let b = parseColorComponent(parts[2])
+        else { return nil }
+        let a: CGFloat
+        if hasAlpha, let alpha = parseAlphaComponent(parts[3]) {
+            a = alpha
+        } else if hasAlpha {
+            return nil
+        } else {
+            a = 1
+        }
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    private static func parsingHSLFunction(_ string: String) -> NSColor? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.hasPrefix("hsl") else { return nil }
+        guard let open = trimmed.firstIndex(of: "("),
+              trimmed.hasSuffix(")")
+        else { return nil }
+        let inner = trimmed[trimmed.index(after: open)..<trimmed.index(before: trimmed.endIndex)]
+        let parts = inner.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let hasAlpha = trimmed.hasPrefix("hsla")
+        guard parts.count == (hasAlpha ? 4 : 3) else { return nil }
+
+        guard let h = parseHueComponent(parts[0]),
+              let s = parsePercentComponent(parts[1]),
+              let l = parsePercentComponent(parts[2])
+        else { return nil }
+        let a: CGFloat
+        if hasAlpha, let alpha = parseAlphaComponent(parts[3]) {
+            a = alpha
+        } else if hasAlpha {
+            return nil
+        } else {
+            a = 1
+        }
+        return hslToSRGB(h: h, s: s, l: l, a: a)
+    }
+
+    private static func hslToSRGB(h: CGFloat, s: CGFloat, l: CGFloat, a: CGFloat) -> NSColor {
+        let q = l < 0.5 ? l * (1 + s) : l + s - l * s
+        let p = 2 * l - q
+        let r = hueToRGB(p: p, q: q, t: h + 1 / 3)
+        let g = hueToRGB(p: p, q: q, t: h)
+        let b = hueToRGB(p: p, q: q, t: h - 1 / 3)
+        return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    private static func hueToRGB(p: CGFloat, q: CGFloat, t: CGFloat) -> CGFloat {
+        var t = t
+        if t < 0 { t += 1 }
+        if t > 1 { t -= 1 }
+        if t < 1 / 6 { return p + (q - p) * 6 * t }
+        if t < 1 / 2 { return q }
+        if t < 2 / 3 { return p + (q - p) * (2 / 3 - t) * 6 }
+        return p
+    }
+
+    private static func parseColorComponent(_ raw: String) -> CGFloat? {
+        if raw.hasSuffix("%") {
+            return parsePercentComponent(raw)
+        }
+        guard let value = Double(raw) else { return nil }
+        if value <= 1 { return CGFloat(value) }
+        guard value <= 255 else { return nil }
+        return CGFloat(value / 255)
+    }
+
+    private static func parsePercentComponent(_ raw: String) -> CGFloat? {
+        var s = raw
+        if s.hasSuffix("%") { s.removeLast() }
+        guard let value = Double(s), value >= 0, value <= 100 else { return nil }
+        return CGFloat(value / 100)
+    }
+
+    private static func parseHueComponent(_ raw: String) -> CGFloat? {
+        var s = raw
+        if s.hasSuffix("deg") { s.removeLast(3) }
+        else if s.hasSuffix("rad") { s.removeLast(3) }
+        else if s.hasSuffix("turn") { s.removeLast(4) }
+        guard let value = Double(s) else { return nil }
+        let degrees: Double
+        if raw.hasSuffix("rad") { degrees = value * 180 / .pi }
+        else if raw.hasSuffix("turn") { degrees = value * 360 }
+        else { degrees = value }
+        return CGFloat((degrees.truncatingRemainder(dividingBy: 360)) / 360)
+    }
+
+    private static func parseAlphaComponent(_ raw: String) -> CGFloat? {
+        if raw.hasSuffix("%") {
+            return parsePercentComponent(raw)
+        }
+        guard let value = Double(raw), value >= 0, value <= 1 else { return nil }
+        return CGFloat(value)
     }
 
     /// Rec. 601 luma — used to decide whether a color reads better with white

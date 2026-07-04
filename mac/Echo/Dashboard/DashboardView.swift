@@ -7,7 +7,7 @@ import Charts
 struct DashboardView: View {
     @Environment(NotchLayoutGuide.self) private var notchLayout
 
-    @State private var selection: SidebarItem? = .general
+    @State private var selection: SidebarItem? = .statistics
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,10 +33,10 @@ struct DashboardView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
             } detail: {
                 switch selection {
-                case .general, .none: GeneralSettingsPane()
+                case .general:        GeneralSettingsPane()
                 case .clipboard:      ClipboardSettingsPane()
                 case .privacy:        PrivacySettingsPane()
-                case .statistics:     StatisticsPane()
+                case .statistics, .none: StatisticsPane()
                 case .history:        ClipboardHistoryPane()
                 case .about:          AboutPane()
                 }

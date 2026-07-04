@@ -23,9 +23,11 @@ final class ClipViewModel {
 
     private let store: ClipStore
     private let monitor: ClipboardMonitor
+    private let linkFetcher = LinkMetadataFetcher()
     private var panelLoadTask: Task<Void, Never>?
     private var sortRefreshTask: Task<Void, Never>?
     private var pendingSortBumps: Set<UUID> = []
+    private var enrichingLinks: Set<UUID> = []
 
     init(store: ClipStore, monitor: ClipboardMonitor) {
         self.store = store
@@ -77,11 +79,47 @@ final class ClipViewModel {
     }
 
     /// Schedules a sort refresh after a short delay when a clip is captured or re-copied.
-    func handleNewClip(_ result: ClipStore.SaveResult) {
+    func handleNewClip(_ clip: Clip, _ result: ClipStore.SaveResult) {
         if case .duplicate(let id) = result {
             pendingSortBumps.insert(id)
         }
         scheduleClipsSortRefresh()
+
+        if clip.isLink {
+            Task { await enrichLinkMetadata(for: clip) }
+        }
+    }
+
+    /// Loads link preview metadata for clips saved before enrichment existed.
+    func ensureLinkMetadata(for clip: Clip) async {
+        guard clip.needsLinkMetadata else { return }
+        await enrichLinkMetadata(for: clip)
+    }
+
+    private func enrichLinkMetadata(for clip: Clip) async {
+        guard clip.isLink, let urlString = clip.linkURLString else { return }
+        guard !enrichingLinks.contains(clip.id) else { return }
+        enrichingLinks.insert(clip.id)
+        defer { enrichingLinks.remove(clip.id) }
+
+        let meta = await linkFetcher.fetch(for: urlString)
+        guard meta.title != nil || meta.imageData != nil || meta.faviconData != nil else { return }
+
+        await store.updateLinkMetadata(
+            id: clip.id,
+            title: meta.title,
+            imageData: meta.imageData,
+            faviconData: meta.faviconData
+        )
+
+        let updated = clip.withLinkMetadata(
+            title: meta.title,
+            imageData: meta.imageData,
+            faviconData: meta.faviconData
+        )
+        if let index = clips.firstIndex(where: { $0.id == clip.id }) {
+            clips[index] = updated
+        }
     }
 
     private func cancelScheduledSortRefresh() {

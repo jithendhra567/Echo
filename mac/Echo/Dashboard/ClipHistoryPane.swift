@@ -144,6 +144,12 @@ private struct ClipHistoryRow: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 26, height: 26)
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            } else if clip.isLink, let preview = clip.linkImage ?? clip.linkFavicon {
+                Image(nsImage: preview)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
 
             if justCopied {
@@ -182,8 +188,11 @@ private struct ClipHistoryRow: View {
         .onDrag { clip.itemProvider }
         .contextMenu { menuItems }
         .task(id: clip.id) {
-            guard clip.contentType == .image else { return }
-            thumbnail = await ClipRowCache.thumbnail(for: clip)
+            if clip.contentType == .image {
+                thumbnail = await ClipRowCache.thumbnail(for: clip)
+            } else if clip.needsLinkMetadata {
+                await clipVM.ensureLinkMetadata(for: clip)
+            }
         }
     }
 
@@ -202,18 +211,27 @@ private struct ClipHistoryRow: View {
         } else {
             typeBadge
                 .overlay(alignment: .bottomTrailing) {
-                    if clip.hexColor != nil { typeCornerBadge }
+                    if clip.parsedColor != nil { typeCornerBadge }
                 }
         }
     }
 
     @ViewBuilder
     private var typeCornerBadge: some View {
-        if let color = clip.hexColor {
+        if let color = clip.parsedColor {
             Circle()
                 .fill(Color(nsColor: color))
                 .frame(width: 12, height: 12)
                 .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 1.5))
+                .offset(x: 3, y: 3)
+        } else if clip.isLink, let favicon = clip.linkFavicon {
+            Image(nsImage: favicon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 12, height: 12)
+                .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 1.5))
                 .offset(x: 3, y: 3)
         } else {
             Image(systemName: typeSymbol)
@@ -262,16 +280,23 @@ private struct ClipHistoryRow: View {
     // MARK: Derived
 
     private var titleText: String {
-        ClipRowCache.previewText(for: clip)
+        if clip.isLink, let title = clip.linkTitle, !title.isEmpty {
+            return title
+        }
+        return ClipRowCache.previewText(for: clip)
     }
 
     private var subtitleText: String {
-        clip.sourceAppName ?? "Unknown"
+        if clip.isLink, let domain = StatsProvider.displayDomain(of: clip.plainText ?? "") {
+            return domain
+        }
+        return clip.sourceAppName ?? "Unknown"
     }
 
     private var typeSymbol: String {
         switch clip.autoTag {
-        case .url:      "link"
+        case .link:     "link"
+        case .color:    "paintpalette.fill"
         case .code:     "chevron.left.forwardslash.chevron.right"
         case .richText: "textformat"
         case .image:    "photo"
@@ -281,7 +306,8 @@ private struct ClipHistoryRow: View {
 
     private var typeColor: Color {
         switch clip.autoTag {
-        case .url:      .blue
+        case .link:     .blue
+        case .color:    .purple
         case .code:     .purple
         case .richText: .orange
         case .image:    .pink

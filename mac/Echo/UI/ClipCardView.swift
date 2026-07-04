@@ -4,6 +4,7 @@ struct ClipCardView: View {
     let clip: Clip
     @Environment(ClipViewModel.self) private var viewModel
     @State private var isHovered = false
+    @State private var isDragging = false
     @State private var isCopied = false
     @State private var headerColor: Color = .gray
 
@@ -16,14 +17,22 @@ struct ClipCardView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .shadow(color: .black.opacity(isHovered ? 0.20 : 0.09), radius: isHovered ? 14 : 6, y: 2)
-        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .scaleEffect(isHovered && !isDragging ? 1.03 : 1.0)
+        .opacity(isDragging ? 0 : 1)
         .overlay {
             if isCopied { copiedOverlay }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isHovered)
+        .animation(.easeOut(duration: 0.15), value: isDragging)
         .overlay {
-            ClipCardMouseBridge(clip: clip, viewModel: viewModel, onTap: handleTap, isHovered: $isHovered)
-                .frame(width: 175, height: 185)
+            ClipCardMouseBridge(
+                clip: clip,
+                viewModel: viewModel,
+                onTap: handleTap,
+                isHovered: $isHovered,
+                isDragging: $isDragging
+            )
+            .frame(width: 175, height: 185)
         }
         .contextMenu {
             Button("Copy") { handleTap() }
@@ -36,6 +45,11 @@ struct ClipCardView: View {
         }
         .task(id: clip.sourceAppBundle) {
             headerColor = await resolvedHeaderColor()
+        }
+        .task(id: clip.id) {
+            if clip.needsLinkMetadata {
+                await viewModel.ensureLinkMetadata(for: clip)
+            }
         }
     }
 
@@ -67,15 +81,18 @@ struct ClipCardView: View {
     }
 
     private var headerLabel: String {
-        clip.hexColor != nil ? "Color" : clip.autoTag.cardLabel
+        if clip.parsedColor != nil { return "Color" }
+        return clip.autoTag.cardLabel
     }
 
     // MARK: - Content preview
 
     @ViewBuilder
     private var contentPreview: some View {
-        if let hex = clip.hexColor {
-            colorContent(hex)
+        if let color = clip.parsedColor {
+            colorContent(color)
+        } else if clip.isLink {
+            linkContent
         } else {
             switch clip.contentType {
             case .image:              imageContent
@@ -90,7 +107,7 @@ struct ClipCardView: View {
     /// swatch's perceived brightness so the value stays readable.
     private func colorContent(_ color: NSColor) -> some View {
         let isLight = color.perceivedBrightness > 0.62
-        let displayText = clip.hexColorDisplayString ?? (clip.plainText ?? "")
+        let displayText = clip.colorDisplayString ?? (clip.plainText ?? "")
         return ZStack {
             Color(nsColor: color)
             Text(displayText)
@@ -139,6 +156,52 @@ struct ClipCardView: View {
     }
 
     @ViewBuilder
+    private var linkContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let img = clip.linkImage {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 88)
+                    .clipped()
+            } else {
+                Color.secondary.opacity(0.08)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 88)
+            }
+
+            Divider().opacity(0.3)
+
+            HStack(alignment: .top, spacing: 6) {
+                if let favicon = clip.linkFavicon {
+                    Image(nsImage: favicon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 14, height: 14)
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                        .padding(.top, 1)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(clip.linkTitle ?? clip.windowTitle ?? StatsProvider.displayDomain(of: clip.plainText ?? "") ?? "Link")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Text(clip.plainText ?? "")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
     private var textContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
@@ -155,30 +218,12 @@ struct ClipCardView: View {
 
             Divider().opacity(0.3)
 
-            if clip.contentType == .url {
-                VStack(alignment: .leading, spacing: 2) {
-                    if let title = clip.windowTitle ?? clip.sourceAppName {
-                        Text(title)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                    }
-                    Text(clip.plainText ?? "")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+            Text("\(clip.plainText?.count ?? 0) characters")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-            } else {
-                Text("\(clip.plainText?.count ?? 0) characters")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -232,10 +277,14 @@ struct ClipCardView: View {
     // MARK: - Header color
 
     private func resolvedHeaderColor() async -> Color {
-        if let hex = clip.hexColor {
-            // Darken the user's color so white tag/timestamp text stays legible
-            // on the header band, without straying too far from the actual hue.
-            return Color(nsColor: hex.darkenedForHeader())
+        if let color = clip.parsedColor {
+            return Color(nsColor: color.darkenedForHeader())
+        }
+        if clip.isLink {
+            if let icon = clip.appIcon, let color = icon.averageColor {
+                return Color(nsColor: color)
+            }
+            return ClipTag.link.cardColor
         }
         if let icon = clip.appIcon, let color = icon.averageColor {
             return Color(nsColor: color)
@@ -251,7 +300,8 @@ extension ClipTag {
         switch self {
         case .all:      return "Clip"
         case .text:     return "Text"
-        case .url:      return "Link"
+        case .link:     return "Link"
+        case .color:    return "Color"
         case .image:    return "Image"
         case .richText: return "Rich Text"
         case .code:     return "Code"
@@ -262,7 +312,8 @@ extension ClipTag {
         switch self {
         case .all:      return Color(red: 0.35, green: 0.35, blue: 0.38)
         case .text:     return Color(red: 0.72, green: 0.52, blue: 0.08)
-        case .url:      return Color(red: 0.14, green: 0.36, blue: 0.74)
+        case .link:     return Color(red: 0.14, green: 0.36, blue: 0.74)
+        case .color:    return Color(red: 0.55, green: 0.22, blue: 0.62)
         case .image:    return Color(red: 0.70, green: 0.16, blue: 0.14)
         case .richText: return Color(red: 0.38, green: 0.18, blue: 0.70)
         case .code:     return Color(red: 0.08, green: 0.48, blue: 0.26)

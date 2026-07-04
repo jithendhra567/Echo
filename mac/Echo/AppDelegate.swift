@@ -44,8 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
-        monitor.onNewClip   = { [weak self] result in
-            self?.viewModel.handleNewClip(result)
+        monitor.onNewClip   = { [weak self] clip, result in
+            self?.viewModel.handleNewClip(clip, result)
         }
 
         hotkeyManager.onFire = { [weak self] in self?.launcherPanel.toggle() }
