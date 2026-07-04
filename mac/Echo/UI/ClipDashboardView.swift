@@ -127,25 +127,27 @@ struct ClipDashboardView: View {
 
     @ViewBuilder
     private var cardArea: some View {
-        if filteredClips.isEmpty {
-            Spacer()
-            Text(viewModel.clips.isEmpty
-                 ? "Copy something to get started"
-                 : "No results for \"\(searchText)\"")
-                .foregroundStyle(.secondary)
-                .font(.subheadline)
-            Spacer()
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
-                    ForEach(filteredClips) { clip in
-                        ClipCardView(clip: clip)
+        Group {
+            if filteredClips.isEmpty {
+                Text(viewModel.clips.isEmpty
+                     ? "Copy something to get started"
+                     : "No results for \"\(searchText)\"")
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(filteredClips) { clip in
+                            ClipCardView(clip: clip)
+                        }
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
             }
         }
+        .frame(height: 205)
     }
 }
 

@@ -52,9 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Clipboard panel hotkey (configurable, default ⌘⇧V)
         clipHotkeyManager.onFire = { [weak self] in
-            guard let self else { return }
-            self.panel.toggle()
-            if self.panel.isShowing { self.viewModel.loadClips() }
+            self?.panel.toggle()
         }
         clipHotkeyManager.register(keyCode: launcherSettings.clipKeyCode,
                                    modifiers: launcherSettings.clipModifiers)
@@ -62,9 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherSettings.onClipHotkeyChanged = { [weak self] keyCode, mods in
             guard let self else { return }
             self.clipHotkeyManager.onFire = { [weak self] in
-                guard let self else { return }
-                self.panel.toggle()
-                if self.panel.isShowing { self.viewModel.loadClips() }
+                self?.panel.toggle()
             }
             self.clipHotkeyManager.register(keyCode: keyCode, modifiers: mods)
         }

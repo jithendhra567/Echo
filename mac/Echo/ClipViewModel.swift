@@ -28,10 +28,12 @@ final class ClipViewModel {
     // MARK: - Data
 
     func loadClips() {
-        Task {
-            let fetched = await store.fetchRecent()
-            clips = fetched
-        }
+        Task { await refreshClips() }
+    }
+
+    /// Fetches the latest clips and waits until they are in memory.
+    func refreshClips() async {
+        clips = await store.fetchRecent()
     }
 
     // MARK: - Actions

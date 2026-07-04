@@ -1,14 +1,56 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Presentation state (SwiftUI-driven slide)
+
+@Observable
+final class ClipboardPanelPresentation {
+    var isPresented = false
+}
+
+/// Hosts the clipboard UI and slides it from below the dock via SwiftUI offset.
+/// The window frame never moves — only the content animates, which avoids AppKit
+/// `animator().setFrame` getting stuck on transparent NSPanels.
+private struct ClipboardPanelRoot: View {
+    @Environment(ClipboardPanelPresentation.self) private var presentation
+    let viewModel: ClipViewModel
+
+    static let panelHeight: CGFloat = 282
+    static let slideDistance: CGFloat = 300
+
+    var body: some View {
+        Color.clear
+            .overlay(alignment: .bottom) {
+                ClipDashboardView()
+                    .environment(viewModel)
+                    .frame(height: Self.panelHeight)
+                    .offset(y: presentation.isPresented ? 0 : Self.slideDistance)
+                    .animation(
+                        presentation.isPresented
+                            ? .easeOut(duration: 0.42)
+                            : .easeIn(duration: 0.30),
+                        value: presentation.isPresented
+                    )
+            }
+    }
+}
+
+// MARK: - Panel
+
 /// A non-activating floating NSPanel that slides up from the bottom of the screen.
 /// "Non-activating" means the previously focused app (e.g. VS Code) remains key,
 /// enabling seamless drag-and-drop out of the panel.
 final class ClipboardPanel: NSPanel {
     private(set) var isShowing = false
+    private var isOpening = false
     private var localKeyMonitor: Any?
+    private var hideTask: DispatchWorkItem?
+    private var showTask: Task<Void, Never>?
+    private let presentation = ClipboardPanelPresentation()
+    private let viewModel: ClipViewModel
 
     init(viewModel: ClipViewModel) {
+        self.viewModel = viewModel
         super.init(
             contentRect: .zero,
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
@@ -16,9 +58,12 @@ final class ClipboardPanel: NSPanel {
             defer: false
         )
         configure()
-        contentView = NSHostingView(
-            rootView: ClipDashboardView().environment(viewModel)
+        let hosting = NSHostingView(
+            rootView: ClipboardPanelRoot(viewModel: viewModel)
+                .environment(presentation)
         )
+        hosting.wantsLayer = true
+        contentView = hosting
     }
 
     private func configure() {
@@ -33,70 +78,72 @@ final class ClipboardPanel: NSPanel {
         titlebarAppearsTransparent = true
     }
 
-    // MARK: - Show / Hide
+    // MARK: - Layout
 
-    /// Smooth deceleration — no overshoot, feels like rising from below the dock.
-    private static let slideUpTiming = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
-    private static let slideDownTiming = CAMediaTimingFunction(controlPoints: 0.55, 0.0, 0.75, 0.4)
-
-    private func layoutFrames(for screen: NSScreen) -> (start: NSRect, final: NSRect) {
+    /// Fixed window frame: tall enough to hold the panel plus off-screen slide room below.
+    private func windowFrame(for screen: NSScreen) -> NSRect {
         let vis = screen.visibleFrame
         let w = vis.width - 40
-        let h: CGFloat = 270
+        let h = ClipboardPanelRoot.panelHeight + ClipboardPanelRoot.slideDistance
         let x = vis.minX + 20
-        let final = NSRect(x: x, y: vis.minY + 12, width: w, height: h)
-        // Start fully below the visible frame so the panel clearly emerges from off-screen.
-        let start = NSRect(x: x, y: vis.minY - h - 36, width: w, height: h)
-        return (start, final)
+        // Window bottom aligns with the panel's resting bottom edge.
+        let y = vis.minY + 12
+        return NSRect(x: x, y: y, width: w, height: h)
     }
 
+    // MARK: - Show / Hide
+
     func show() {
-        guard !isShowing, let screen = NSScreen.main else { return }
-        let frames = layoutFrames(for: screen)
+        guard !isShowing, !isOpening, let screen = NSScreen.main else { return }
+        hideTask?.cancel()
+        hideTask = nil
+        showTask?.cancel()
 
-        alphaValue = 0
-        setFrame(frames.start, display: false)
-        isShowing = true
-        makeKeyAndOrderFront(nil)
-        setupKeyMonitor()
+        isOpening = true
+        showTask = Task { @MainActor in
+            await viewModel.refreshClips()
+            guard !Task.isCancelled else {
+                isOpening = false
+                return
+            }
 
-        // Wait one turn so the window is composited at the off-screen pose before animating.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.isShowing else { return }
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.50
-                ctx.timingFunction = Self.slideUpTiming
-                ctx.allowsImplicitAnimation = true
-                self.animator().alphaValue = 1
-                self.animator().setFrame(frames.final, display: true)
+            presentation.isPresented = false
+            setFrame(windowFrame(for: screen), display: true)
+            isOpening = false
+            isShowing = true
+            orderFrontRegardless()
+            makeKey()
+            setupKeyMonitor()
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isShowing else { return }
+                self.presentation.isPresented = true
             }
         }
     }
 
     func hide() {
-        guard isShowing, let screen = NSScreen.main else { return }
-        let f = frame
-        let vis = screen.visibleFrame
+        showTask?.cancel()
+        showTask = nil
+        isOpening = false
+        guard isShowing else { return }
+        hideTask?.cancel()
+
         isShowing = false
         tearDownKeyMonitor()
+        presentation.isPresented = false
 
-        let exitFrame = NSRect(x: f.minX, y: vis.minY - f.height - 36, width: f.width, height: f.height)
-
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.36
-            ctx.timingFunction = Self.slideDownTiming
-            ctx.allowsImplicitAnimation = true
-            self.animator().alphaValue = 0
-            self.animator().setFrame(exitFrame, display: true)
-        }, completionHandler: {
-            MainActor.assumeIsolated {
-                self.alphaValue = 1
-                self.orderOut(nil)
-            }
-        })
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.isShowing else { return }
+            self.orderOut(nil)
+        }
+        hideTask = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32, execute: work)
     }
 
-    func toggle() { isShowing ? hide() : show() }
+    func toggle() {
+        if isShowing || isOpening { hide() } else { show() }
+    }
 
     // MARK: - Keyboard handling
 
