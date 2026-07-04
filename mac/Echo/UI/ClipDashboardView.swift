@@ -102,6 +102,9 @@ struct ClipDashboardView: View {
             )
             .frame(maxWidth: .infinity)
 
+            PlainTextPasteToggle(style: .panel)
+                .fixedSize()
+
             // Close button — right side
             Button { viewModel.dismiss() } label: {
                 Image(systemName: "xmark")

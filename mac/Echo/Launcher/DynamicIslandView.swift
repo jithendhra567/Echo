@@ -278,6 +278,16 @@ struct DynamicIslandView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 .animation(.spring(response: 0.22, dampingFraction: 0.8), value: vm.searchQuery.isEmpty)
             }
+
+            Button {
+                vm.openDashboard()
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.38))
+            }
+            .buttonStyle(.plain)
+            .help("Open Dashboard")
         }
         .padding(.horizontal, 14)
         .padding(.top, 20)
@@ -461,7 +471,12 @@ struct DynamicIslandView: View {
     private var clipColumn: some View {
         let clips = vm.filteredClips
         return VStack(spacing: 0) {
-            sectionLabel("CLIPBOARD", active: vm.activePanel == .clipboard)
+            HStack(spacing: 8) {
+                sectionLabel("CLIPBOARD", active: vm.activePanel == .clipboard)
+                Spacer(minLength: 0)
+                PlainTextPasteToggle(style: .launcherColumn)
+            }
+            .padding(.trailing, 10)
             if clips.isEmpty {
                 emptyLabel(clipVM.clips.isEmpty ? "Nothing copied yet" : "No matches")
             } else {

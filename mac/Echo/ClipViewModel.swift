@@ -6,6 +6,13 @@ import Observation
 final class ClipViewModel {
     var clips: [Clip] = []
 
+    private static let pastePlainTextOnlyKey = "echo_clipboard_paste_plain_text_only"
+
+    /// When enabled, copies strip RTF/metadata so pasting into Excel and similar apps yields plain text only.
+    var pastePlainTextOnly: Bool {
+        didSet { UserDefaults.standard.set(pastePlainTextOnly, forKey: Self.pastePlainTextOnlyKey) }
+    }
+
     /// Set by AppDelegate so the panel can be hidden after a copy.
     var onDismiss: (() -> Void)?
 
@@ -15,6 +22,7 @@ final class ClipViewModel {
     init(store: ClipStore, monitor: ClipboardMonitor) {
         self.store = store
         self.monitor = monitor
+        pastePlainTextOnly = UserDefaults.standard.bool(forKey: Self.pastePlainTextOnlyKey)
     }
 
     // MARK: - Data
@@ -29,13 +37,22 @@ final class ClipViewModel {
     // MARK: - Actions
 
     func copy(_ clip: Clip) {
-        copyToPasteboard(clip)
+        copyForPaste(clip)
         onDismiss?()
     }
 
     func copyAsPlainText(_ clip: Clip) {
         copyToPasteboardAsPlainText(clip)
         onDismiss?()
+    }
+
+    /// Copies using the current paste mode — plain text when `pastePlainTextOnly` is on.
+    func copyForPaste(_ clip: Clip) {
+        if pastePlainTextOnly, clip.supportsPlainTextCopy {
+            copyToPasteboardAsPlainText(clip)
+        } else {
+            copyToPasteboard(clip)
+        }
     }
 
     /// Writes plain text to the pasteboard without recording a new clip.

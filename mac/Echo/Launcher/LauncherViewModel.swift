@@ -44,6 +44,7 @@ final class LauncherViewModel {
 
     var onDismiss: (() -> Void)?
     var onLaunch:  (() -> Void)?
+    var onOpenDashboard: (() -> Void)?
     var onInstantSearchChanged: ((Bool) -> Void)?
 
     var clipVM: ClipViewModel?
@@ -408,7 +409,7 @@ final class LauncherViewModel {
     func copyClip(_ clip: Clip) {
         guard let clipVM else { return }
         copiedClipID = clip.id
-        clipVM.copyToPasteboard(clip)
+        clipVM.copyForPaste(clip)
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -511,6 +512,11 @@ final class LauncherViewModel {
     }
 
     func dismiss() { onDismiss?() }
+
+    func openDashboard() {
+        onOpenDashboard?()
+        dismiss()
+    }
 
     func expand() {
         tabPollerTask?.cancel()

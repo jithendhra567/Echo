@@ -208,7 +208,7 @@ struct ClipCardView: View {
     // MARK: - Actions
 
     private func handleTap() {
-        viewModel.copyToPasteboard(clip)
+        viewModel.copyForPaste(clip)
         showCopiedThenDismiss()
     }
 
