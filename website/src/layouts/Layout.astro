@@ -6,8 +6,8 @@ interface Props {
 }
 
 const {
-  title       = 'EchoBar — Your Mac, Supercharged.',
-  description = 'A spotlight-style productivity layer that lives in your menu bar. Search apps, browser tabs, run instant calculations, convert currencies, manage your clipboard — all with one keystroke.',
+  title       = 'Echo — Clipboard, Launcher & Notch for Mac',
+  description = 'Echo is a free menu bar app for macOS. Search apps and browser tabs, recall every copy, control your notch — clipboard manager, app launcher, and notch panel in one keystroke.',
   ogImage     = '/og.png',
 } = Astro.props;
 
@@ -17,7 +17,7 @@ const ogURL     = new URL(ogImage, Astro.site ?? 'https://echobar.app');
 const ld = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "EchoBar",
+  "name": "Echo",
   "operatingSystem": "macOS 14+",
   "applicationCategory": "ProductivityApplication",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -36,7 +36,7 @@ const ld = {
   <!-- Primary -->
   <title>{title}</title>
   <meta name="description" content={description} />
-  <meta name="author" content="EchoBar" />
+  <meta name="author" content="Echo" />
   <meta name="theme-color" content="#09090b" />
   <meta name="color-scheme" content="dark" />
 
@@ -46,7 +46,7 @@ const ld = {
   <meta property="og:title"       content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:image"       content={ogURL} />
-  <meta property="og:site_name"   content="EchoBar" />
+  <meta property="og:site_name"   content="Echo" />
 
   <!-- Twitter -->
   <meta name="twitter:card"        content="summary_large_image" />

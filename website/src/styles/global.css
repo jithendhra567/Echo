@@ -178,6 +178,10 @@ body {
   100% { background-position:  200% center; }
 }
 
+/* ── 3D perspective utilities ── */
+.perspective { perspective: 1200px; }
+.preserve-3d { transform-style: preserve-3d; }
+
 /* ── Section fade utility ── */
 .reveal { opacity: 0; transform: translateY(28px); }
 
