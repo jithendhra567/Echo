@@ -277,14 +277,16 @@ final class BrowserTabEngine: Sendable {
                 set wIdx to 1
                 repeat with w in windows
                     try
-                        set tIdx to 1
-                        repeat with t in tabs of w
-                            set tURL to URL of t
-                            if tURL is not missing value then
-                                set out to out & my sanitize(title of t) & "\(fs)" & tURL & "\(fs)" & wIdx & "\(fs)" & tIdx & "\(rs)"
-                            end if
-                            set tIdx to tIdx + 1
-                        end repeat
+                        if incognito of w is false then
+                            set tIdx to 1
+                            repeat with t in tabs of w
+                                set tURL to URL of t
+                                if tURL is not missing value then
+                                    set out to out & my sanitize(title of t) & "\(fs)" & tURL & "\(fs)" & wIdx & "\(fs)" & tIdx & "\(rs)"
+                                end if
+                                set tIdx to tIdx + 1
+                            end repeat
+                        end if
                     end try
                     set wIdx to wIdx + 1
                 end repeat

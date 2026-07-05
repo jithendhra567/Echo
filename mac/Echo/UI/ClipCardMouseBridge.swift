@@ -133,6 +133,7 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             )
 
             isDraggingBinding?.wrappedValue = true
+            AnalyticsService.logClipDragStarted(contentType: clip.contentType.rawValue)
             let session = beginDraggingSession(with: [item], event: event, source: self)
             session.animatesToStartingPositionsOnCancelOrFail = true
         }
@@ -142,6 +143,9 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             endedAt screenPoint: NSPoint,
             operation: NSDragOperation
         ) {
+            let contentType = clip?.contentType.rawValue ?? "unknown"
+            let outcome = operation == [] ? "cancelled" : "dropped"
+            AnalyticsService.logClipDragCompleted(contentType: contentType, outcome: outcome)
             if operation == [] {
                 isDraggingBinding?.wrappedValue = false
                 return

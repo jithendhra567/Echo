@@ -39,9 +39,9 @@ struct ClipCardView: View {
             if clip.supportsPlainTextCopy {
                 Button("Copy as Plain Text") { handlePlainTextCopy() }
             }
-            Button(clip.isPinned ? "Unpin" : "Pin") { viewModel.pin(clip) }
+            Button(clip.isPinned ? "Unpin" : "Pin") { viewModel.pin(clip, surface: "clipboard_panel") }
             Divider()
-            Button("Delete", role: .destructive) { viewModel.delete(clip) }
+            Button("Delete", role: .destructive) { viewModel.delete(clip, surface: "clipboard_panel") }
         }
         .task(id: clip.sourceAppBundle) {
             headerColor = await resolvedHeaderColor()
@@ -255,12 +255,12 @@ struct ClipCardView: View {
     // MARK: - Actions
 
     private func handleTap() {
-        viewModel.copyForPaste(clip)
+        viewModel.copyForPaste(clip, surface: "clipboard_panel")
         showCopiedThenDismiss()
     }
 
     private func handlePlainTextCopy() {
-        viewModel.copyToPasteboardAsPlainText(clip)
+        viewModel.copyToPasteboardAsPlainText(clip, surface: "clipboard_panel")
         showCopiedThenDismiss()
     }
 

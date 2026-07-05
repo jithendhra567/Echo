@@ -216,7 +216,7 @@ final class TrayModule: NotchModule {
                     }) else { return }
                     do {
                         let shelfURL = try self.resolvedShelfURL(from: fileURL)
-                        self.addFiles([shelfURL])
+                        self.addFiles([shelfURL], dropKind: "file")
                     } catch {}
                 }
             }
@@ -239,7 +239,7 @@ final class TrayModule: NotchModule {
                                 data: bytesAndExt.0,
                                 preferredExtension: bytesAndExt.1
                             )
-                            self.addFiles([shelfURL])
+                            self.addFiles([shelfURL], dropKind: "image")
                         } catch {}
                     case .failure:
                         break
@@ -261,12 +261,17 @@ final class TrayModule: NotchModule {
         }
     }
 
-    func addFiles(_ urls: [URL]) {
+    func addFiles(_ urls: [URL], dropKind: String = "file") {
         let fresh = urls
             .filter { u in !files.contains(where: { $0.url == u }) }
             .map { TrayFile(url: $0) }
         guard !fresh.isEmpty else { return }
         files.append(contentsOf: fresh)
+        AnalyticsService.logTrayFileDropped(
+            fileCount: fresh.count,
+            importMode: dropImportMode.rawValue,
+            dropKind: dropKind
+        )
         onContentChanged?()
     }
 
@@ -277,15 +282,20 @@ final class TrayModule: NotchModule {
         }
         files.removeAll { $0.id == id }
         if selectedIDs.contains(id) { selectedIDs.remove(id) }
+        AnalyticsService.logTrayFileRemoved(remainingCount: files.count)
         onContentChanged?()
     }
 
     func clearAll() {
+        let count = files.count
         for file in files where isUnderShelf(file.url) {
             try? FileManager.default.removeItem(at: file.url)
         }
         files.removeAll()
         selectedIDs.removeAll()
+        if count > 0 {
+            AnalyticsService.logTrayCleared(fileCount: count)
+        }
         onContentChanged?()
     }
 
@@ -293,6 +303,7 @@ final class TrayModule: NotchModule {
 
     func dragBegan() {
         isDragInFlight = true
+        AnalyticsService.logSystemFileDragDetected()
         onContentChanged?()
     }
 
@@ -612,6 +623,7 @@ private final class CardHostView: NSView, NSDraggingSource {
 
     private func startDrag(from event: NSEvent) {
         guard !dragURLs.isEmpty else { return }
+        AnalyticsService.logTrayDragOutStarted(fileCount: dragURLs.count)
         let items = dragURLs.enumerated().map { i, url -> NSDraggingItem in
             let item  = NSDraggingItem(pasteboardWriter: url as NSURL)
             let icon  = NSWorkspace.shared.icon(forFile: url.path)
@@ -638,6 +650,18 @@ private final class CardHostView: NSView, NSDraggingSource {
         endedAt screenPoint: NSPoint,
         operation: NSDragOperation
     ) {
+        let count = dragURLs.count
+        let outcome: String
+        if operation == [] {
+            outcome = "cancelled"
+        } else if operation == .move {
+            outcome = "moved"
+        } else {
+            outcome = "copied"
+        }
+        Task { @MainActor in
+            AnalyticsService.logTrayDragOutCompleted(fileCount: count, outcome: outcome)
+        }
         guard operation == .move else { return }
         Task { @MainActor [weak self] in
             self?.onDragEndedWithMove?()

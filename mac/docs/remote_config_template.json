@@ -1,0 +1,46 @@
+{
+  "parameters": {
+    "min_required_version": {
+      "defaultValue": { "value": "1.0" },
+      "description": "Users below this version see a blocking force-update screen."
+    },
+    "latest_version": {
+      "defaultValue": { "value": "1.0" },
+      "description": "Users below this version get a soft-update nudge (Sparkle handles download)."
+    },
+    "force_update_title": {
+      "defaultValue": { "value": "Update Required" }
+    },
+    "force_update_message": {
+      "defaultValue": { "value": "Please update to continue using Echo." }
+    },
+    "force_update_button_text": {
+      "defaultValue": { "value": "Download Update" }
+    },
+    "update_download_url": {
+      "defaultValue": { "value": "https://your-website.com/#download" },
+      "description": "Fallback download page when Sparkle cannot install."
+    },
+    "promo_enabled": {
+      "defaultValue": { "value": "false" }
+    },
+    "promo_id": {
+      "defaultValue": { "value": "" },
+      "description": "Change this ID to re-show a dismissed promo."
+    },
+    "promo_text": {
+      "defaultValue": { "value": "" },
+      "description": "Left-side message in the launcher search promo banner."
+    },
+    "promo_link_text": {
+      "defaultValue": { "value": "Learn more" }
+    },
+    "promo_link_url": {
+      "defaultValue": { "value": "" }
+    },
+    "promo_background_color": {
+      "defaultValue": { "value": "#FFFFFF14" },
+      "description": "Hex color (#RRGGBB or #RRGGBBAA)."
+    }
+  }
+}

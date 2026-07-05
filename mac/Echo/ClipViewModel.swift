@@ -15,7 +15,11 @@ final class ClipViewModel {
 
     /// When enabled, copies strip RTF/metadata so pasting into Excel and similar apps yields plain text only.
     var pastePlainTextOnly: Bool {
-        didSet { UserDefaults.standard.set(pastePlainTextOnly, forKey: Self.pastePlainTextOnlyKey) }
+        didSet {
+            UserDefaults.standard.set(pastePlainTextOnly, forKey: Self.pastePlainTextOnlyKey)
+            guard !skipPasteModeAnalytics else { return }
+            AnalyticsService.logPasteModeChanged(enabled: pastePlainTextOnly)
+        }
     }
 
     /// Set by AppDelegate so the panel can be hidden after a copy.
@@ -28,11 +32,13 @@ final class ClipViewModel {
     private var sortRefreshTask: Task<Void, Never>?
     private var pendingSortBumps: Set<UUID> = []
     private var enrichingLinks: Set<UUID> = []
+    private var skipPasteModeAnalytics = true
 
     init(store: ClipStore, monitor: ClipboardMonitor) {
         self.store = store
         self.monitor = monitor
         pastePlainTextOnly = UserDefaults.standard.bool(forKey: Self.pastePlainTextOnlyKey)
+        skipPasteModeAnalytics = false
     }
 
     // MARK: - Data
@@ -80,9 +86,14 @@ final class ClipViewModel {
 
     /// Schedules a sort refresh after a short delay when a clip is captured or re-copied.
     func handleNewClip(_ clip: Clip, _ result: ClipStore.SaveResult) {
+        let isDuplicate: Bool
         if case .duplicate(let id) = result {
             pendingSortBumps.insert(id)
+            isDuplicate = true
+        } else {
+            isDuplicate = false
         }
+        AnalyticsService.logClipCaptured(contentType: clip.contentType.rawValue, isDuplicate: isDuplicate)
         scheduleClipsSortRefresh()
 
         if clip.isLink {
@@ -162,19 +173,25 @@ final class ClipViewModel {
     // MARK: - Actions
 
     func copy(_ clip: Clip) {
-        copyForPaste(clip)
+        copyForPaste(clip, surface: "clipboard_panel")
         onDismiss?()
     }
 
     func copyAsPlainText(_ clip: Clip) {
-        copyToPasteboardAsPlainText(clip)
+        copyToPasteboardAsPlainText(clip, surface: "clipboard_panel")
         onDismiss?()
     }
 
     /// Copies using the current paste mode — plain text when `pastePlainTextOnly` is on.
-    func copyForPaste(_ clip: Clip) {
+    func copyForPaste(_ clip: Clip, surface: String) {
+        let pasteMode = pastePlainTextOnly && clip.supportsPlainTextCopy ? "plain_text" : "default"
+        AnalyticsService.logClipCopied(
+            contentType: clip.contentType.rawValue,
+            surface: surface,
+            pasteMode: pasteMode
+        )
         if pastePlainTextOnly, clip.supportsPlainTextCopy {
-            copyToPasteboardAsPlainText(clip)
+            copyToPasteboardAsPlainText(clip, surface: surface, logAnalytics: false)
         } else {
             copyToPasteboard(clip)
         }
@@ -210,23 +227,32 @@ final class ClipViewModel {
     }
 
     /// Writes only `public.plain-text` — no RTF, images, or URL objects.
-    func copyToPasteboardAsPlainText(_ clip: Clip) {
+    func copyToPasteboardAsPlainText(_ clip: Clip, surface: String = "unknown", logAnalytics: Bool = true) {
         guard clip.supportsPlainTextCopy,
               let text = clip.resolvedPlainText
         else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if logAnalytics {
+            AnalyticsService.logClipCopied(
+                contentType: clip.contentType.rawValue,
+                surface: surface,
+                pasteMode: "plain_text"
+            )
+        }
         copyPlainTextSuppressingCapture(trimmed)
         bumpClipToTop(clip)
     }
 
-    func delete(_ clip: Clip) {
+    func delete(_ clip: Clip, surface: String = "unknown") {
+        AnalyticsService.logClipDeleted(contentType: clip.contentType.rawValue, surface: surface)
         clips.removeAll { $0.id == clip.id }
         Task { await store.delete(id: clip.id) }
     }
 
     /// Clears clipboard history. Pinned clips survive unless `includePinned`.
-    func clearHistory(includePinned: Bool) {
+    func clearHistory(includePinned: Bool, surface: String = "unknown") {
+        AnalyticsService.logClipboardHistoryCleared(includePinned: includePinned, surface: surface)
         clips = includePinned ? [] : clips.filter(\.isPinned)
         Task {
             await store.deleteAll(includePinned: includePinned)
@@ -253,8 +279,13 @@ final class ClipViewModel {
         }
     }
 
-    func pin(_ clip: Clip) {
+    func pin(_ clip: Clip, surface: String = "unknown") {
         let pinned = !clip.isPinned
+        AnalyticsService.logClipPinned(
+            action: pinned ? "pin" : "unpin",
+            contentType: clip.contentType.rawValue,
+            surface: surface
+        )
         if let i = clips.firstIndex(where: { $0.id == clip.id }) {
             clips[i].isPinned = pinned
             clips.sort { ($0.isPinned ? 1 : 0, $0.createdAt) > ($1.isPinned ? 1 : 0, $1.createdAt) }

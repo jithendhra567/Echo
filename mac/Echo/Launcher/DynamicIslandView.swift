@@ -23,11 +23,13 @@ struct DynamicIslandView: View {
     @Environment(LauncherViewModel.self) private var vm
     @Environment(ClipViewModel.self)     private var clipVM
     @Environment(InstantSearchSession.self) private var instantSession
+    @Environment(RemoteConfigService.self) private var remoteConfig
     @FocusState private var isSearchFocused: Bool
 
     @State private var showContent    = false
     @State private var showTimestamps = false
     @State private var instantSearchAnimating = false
+    @State private var promoDismissedLocally = false
     @State private var instantSearchScale: CGFloat = 1.0
 
     private static let launcherSpring = Animation.spring(response: 0.34, dampingFraction: 0.78)
@@ -192,6 +194,18 @@ struct DynamicIslandView: View {
                     searchField
                         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .center)))
 
+                    if shouldShowPromo {
+                        PromoBannerView(
+                            promo: remoteConfig.promo,
+                            onLinkTap: {},
+                            onDismiss: { promoDismissedLocally = true }
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .onChange(of: remoteConfig.promo.id) { _, _ in
+                            promoDismissedLocally = false
+                        }
+                    }
+
                     Rectangle()
                         .fill(Color.white.opacity(0.07))
                         .frame(height: 1)
@@ -209,6 +223,14 @@ struct DynamicIslandView: View {
             }
         }
         .animation(Self.launcherSpring, value: vm.isInstantSearchOpen)
+    }
+
+    private var shouldShowPromo: Bool {
+        let promo = remoteConfig.promo
+        return promo.enabled
+            && !PromoDismissStore.isDismissed(promoID: promo.id)
+            && !promoDismissedLocally
+            && !vm.isSearching
     }
 
     private var instantSearchPanel: some View {
@@ -506,12 +528,12 @@ struct DynamicIslandView: View {
                                     }
                                 }
                                 Divider()
-                                Button { clipVM.pin(clip) } label: {
+                                Button { clipVM.pin(clip, surface: "launcher") } label: {
                                     Label(clip.isPinned ? "Unpin" : "Pin",
                                           systemImage: clip.isPinned ? "pin.slash" : "pin")
                                 }
                                 Divider()
-                                Button(role: .destructive) { clipVM.delete(clip) } label: {
+                                Button(role: .destructive) { clipVM.delete(clip, surface: "launcher") } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
@@ -953,7 +975,7 @@ private struct ClipResultRow: View {
             // Pin: always shown when pinned; appears on hover to pin/unpin.
             if isHovered || clip.isPinned {
                 Button {
-                    clipVM.pin(clip)
+                    clipVM.pin(clip, surface: "launcher")
                 } label: {
                     Image(systemName: clip.isPinned ? "pin.fill" : "pin")
                         .font(.system(size: 10, weight: .semibold))

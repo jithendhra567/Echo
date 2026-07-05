@@ -20,7 +20,7 @@ struct ClipboardHistoryPane: View {
             .confirmationDialog("Clear all unpinned clips?",
                                 isPresented: $showClearConfirm, titleVisibility: .visible) {
                 Button("Clear Unpinned Clips", role: .destructive) {
-                    clipVM.clearHistory(includePinned: false)
+                    clipVM.clearHistory(includePinned: false, surface: "history")
                 }
             } message: {
                 Text("Pinned clips are kept.")
@@ -164,7 +164,7 @@ private struct ClipHistoryRow: View {
             // Pin: always visible when pinned; appears on hover otherwise.
             if isHovered || clip.isPinned {
                 Button {
-                    clipVM.pin(clip)
+                    clipVM.pin(clip, surface: "history")
                 } label: {
                     Image(systemName: clip.isPinned ? "pin.fill" : "pin")
                         .font(.system(size: 11))
@@ -272,9 +272,9 @@ private struct ClipHistoryRow: View {
         if clip.supportsPlainTextCopy {
             Button("Copy as Plain Text") { copyPlain() }
         }
-        Button(clip.isPinned ? "Unpin" : "Pin") { clipVM.pin(clip) }
+        Button(clip.isPinned ? "Unpin" : "Pin") { clipVM.pin(clip, surface: "history") }
         Divider()
-        Button("Delete", role: .destructive) { clipVM.delete(clip) }
+        Button("Delete", role: .destructive) { clipVM.delete(clip, surface: "history") }
     }
 
     // MARK: Derived
@@ -318,12 +318,12 @@ private struct ClipHistoryRow: View {
     // MARK: Actions
 
     private func copy() {
-        clipVM.copyForPaste(clip)
+        clipVM.copyForPaste(clip, surface: "history")
         flashCopied()
     }
 
     private func copyPlain() {
-        clipVM.copyToPasteboardAsPlainText(clip)
+        clipVM.copyToPasteboardAsPlainText(clip, surface: "history")
         flashCopied()
     }
 

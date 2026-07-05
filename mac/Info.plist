@@ -26,7 +26,15 @@
 	<string>Echo reads your open browser tabs so you can search and switch to them from the launcher.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Echo shows your camera in the notch mirror when you choose that tab.</string>
-<key>NSHumanReadableCopyright</key>
+		<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/jithendhra567/Echo/releases/download/appcast/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>WexGYfaYOUTjWLCXneBWzg3zZYfp4Fr9k+t923E042c=</string>
 </dict>
 </plist>

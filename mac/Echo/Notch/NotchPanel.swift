@@ -259,7 +259,7 @@ final class NotchPanel: NSPanel {
                 try? await Task.sleep(for: Self.hoverDebounce)
                 guard !Task.isCancelled, cursorOverPill else { return }
                 viewModel.isHovering = true
-                viewModel.open()
+                viewModel.open(trigger: "hover")
             }
             return
         }
@@ -271,7 +271,7 @@ final class NotchPanel: NSPanel {
             try? await Task.sleep(for: Self.hoverDebounce)
             guard !Task.isCancelled, !cursorOverPill else { return }
             viewModel.isHovering = false
-            viewModel.close()
+            viewModel.close(trigger: "hover")
         }
     }
 
@@ -418,7 +418,7 @@ final class NotchPanel: NSPanel {
             let windowPt = self.convertPoint(fromScreen: screenPt)
             let local    = content.convert(windowPt, from: nil)
             if self.dragProximityRect(in: content).contains(local) {
-                self.viewModel.open()
+                self.viewModel.open(trigger: "drag_proximity")
             }
         }
         dragMon.onDragEnded = { [weak self] in
@@ -427,7 +427,7 @@ final class NotchPanel: NSPanel {
                 try? await Task.sleep(for: .milliseconds(220))
                 guard let self else { return }
                 if !self.viewModel.anyModuleActive && !self.viewModel.isHovering {
-                    self.viewModel.close()
+                    self.viewModel.close(trigger: "drag_end")
                 }
             }
         }

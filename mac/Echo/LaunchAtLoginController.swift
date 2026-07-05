@@ -32,6 +32,7 @@ final class LaunchAtLoginController {
                     try SMAppService.mainApp.unregister()
                 }
             }
+            AnalyticsService.logLaunchAtLoginChanged(enabled: enabled)
         } catch {
             lastErrorMessage = error.localizedDescription
         }

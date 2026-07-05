@@ -44,6 +44,11 @@ struct DashboardView: View {
             .navigationTitle("")
             .frame(minWidth: 760, minHeight: 520)
         }
+        .onChange(of: selection) { _, newValue in
+            if let item = newValue {
+                AnalyticsService.logDashboardOpened(source: "sidebar_navigation", section: item.rawValue)
+            }
+        }
     }
 
     private func sidebarRow(_ item: SidebarItem) -> some View {
@@ -234,6 +239,12 @@ struct ClipboardSettingsPane: View {
                     }
                     .padding(8)
                 }
+                .onChange(of: appSettings.isClipboardPaused) {
+                    AnalyticsService.logClipboardPausedChanged(paused: appSettings.isClipboardPaused)
+                }
+                .onChange(of: appSettings.captureImages) {
+                    AnalyticsService.logCaptureImagesChanged(enabled: appSettings.captureImages)
+                }
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
@@ -255,6 +266,7 @@ struct ClipboardSettingsPane: View {
                     .padding(8)
                 }
                 .onChange(of: appSettings.retentionDays) {
+                    AnalyticsService.logRetentionDaysChanged(days: appSettings.retentionDays)
                     // Re-fetch so a shorter window prunes immediately.
                     clipVM.loadClips()
                 }
@@ -278,13 +290,13 @@ struct ClipboardSettingsPane: View {
                 .confirmationDialog("Clear all unpinned clips?",
                                     isPresented: $showClearConfirm, titleVisibility: .visible) {
                     Button("Clear Unpinned Clips", role: .destructive) {
-                        clipVM.clearHistory(includePinned: false)
+                        clipVM.clearHistory(includePinned: false, surface: "dashboard_settings")
                     }
                 }
                 .confirmationDialog("Delete the entire clipboard history, including pinned clips?",
                                     isPresented: $showClearAllConfirm, titleVisibility: .visible) {
                     Button("Delete Everything", role: .destructive) {
-                        clipVM.clearHistory(includePinned: true)
+                        clipVM.clearHistory(includePinned: true, surface: "dashboard_settings")
                     }
                 }
 
@@ -927,7 +939,7 @@ private struct AboutPane: View {
                 Text("Clipboard Manager & App Launcher")
                     .font(.title3)
                     .foregroundStyle(.secondary)
-                Text("Version 1.0")
+                Text("Version \(AppVersion.marketing) (\(AppVersion.build))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }

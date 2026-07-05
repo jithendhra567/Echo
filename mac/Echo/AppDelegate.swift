@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let notchLayoutGuide = NotchLayoutGuide()
     let launchAtLogin = LaunchAtLoginController()
     let appSettings = AppSettings()
+    let remoteConfig = RemoteConfigService()
 
     private var statsProvider: StatsProvider!
     private var store: ClipStore!
@@ -21,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalMonitor: Any?
     private var notchPanel: NotchPanel!
     private var activationObserver: NSObjectProtocol?
+    private let sparkleUpdater = SparkleUpdaterController()
+    private let forceUpdateController = ForceUpdateController()
+    private let appLaunchTime = Date()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Must be set programmatically rather than via LSUIElement = true in Info.plist.
@@ -28,13 +32,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // which the WebContent XPC service inherits, crashing it on launch.
         NSApp.setActivationPolicy(.accessory)
 
+        FirebaseBootstrap.configure()
+        remoteConfig.start()
+        sparkleUpdater.start()
+        AnalyticsService.logAppLaunch()
+
         store            = ClipStore()
         monitor          = ClipboardMonitor(store: store, settings: appSettings)
         statsProvider    = StatsProvider()
         viewModel        = ClipViewModel(store: store, monitor: monitor)
         panel            = ClipboardPanel(viewModel: viewModel)
         launcherSettings = LauncherSettings()
-        launcherPanel    = DynamicIslandWindow(clipViewModel: viewModel, notchLayoutGuide: notchLayoutGuide)
+        launcherPanel    = DynamicIslandWindow(
+            clipViewModel: viewModel,
+            notchLayoutGuide: notchLayoutGuide,
+            remoteConfig: remoteConfig
+        )
         launcherPanel.prewarm()
         launcherPanel.viewModel.warmTabsCache()
         launcherPanel.viewModel.onOpenDashboard = { [weak self] in self?.openDashboard() }
@@ -54,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Clipboard panel hotkey (configurable, default ⌘⇧V)
         clipHotkeyManager.onFire = { [weak self] in
+            AnalyticsService.logClipboardPanelOpened()
             self?.panel.toggle()
         }
         clipHotkeyManager.register(keyCode: launcherSettings.clipKeyCode,
@@ -61,7 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         launcherSettings.onClipHotkeyChanged = { [weak self] keyCode, mods in
             guard let self else { return }
+            AnalyticsService.logHotkeyChanged(target: "clipboard")
             self.clipHotkeyManager.onFire = { [weak self] in
+                AnalyticsService.logClipboardPanelOpened()
                 self?.panel.toggle()
             }
             self.clipHotkeyManager.register(keyCode: keyCode, modifiers: mods)
@@ -70,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Re-register Carbon + NSEvent monitor when user changes the hotkey.
         launcherSettings.onHotkeyChanged = { [weak self] keyCode, mods in
             guard let self else { return }
+            AnalyticsService.logHotkeyChanged(target: "launcher")
             self.hotkeyManager.onFire = { [weak self] in self?.launcherPanel.toggle() }
             self.hotkeyManager.register(keyCode: keyCode, modifiers: mods)
             self.setupGlobalHotkey()
@@ -84,6 +101,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupGlobalHotkey()
         setupAppActivationTracking()
         setupLaunchAtLoginStatusRefresh()
+
+        Task { await evaluateUpdates() }
+    }
+
+    private func evaluateUpdates() async {
+        await remoteConfig.fetchAndActivate()
+
+        switch UpdateManager.evaluate(remoteConfig: remoteConfig) {
+        case .forceUpdate(let required):
+            forceUpdateController.present(
+                config: remoteConfig.forceUpdateConfig,
+                requiredVersion: required,
+                sparkle: sparkleUpdater
+            )
+        case .softUpdate(let latest):
+            AnalyticsService.logSoftUpdateAvailable(current: AppVersion.marketing, latest: latest)
+        case .none:
+            break
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -122,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Dashboard window
 
     @objc private func openDashboard() {
+        AnalyticsService.logDashboardOpened(source: "status_bar_menu", section: "main")
         // Close the launcher first so it doesn't compete for key-window status.
         if launcherPanel.isShowing { launcherPanel.hide() }
 
@@ -201,6 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        let duration = Int(Date().timeIntervalSince(appLaunchTime))
+        AnalyticsService.logAppQuit(sessionDurationSec: max(duration, 0))
         hotkeyManager.unregister()
         clipHotkeyManager.unregister()
         if let m = globalMonitor { NSEvent.removeMonitor(m) }

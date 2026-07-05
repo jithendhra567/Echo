@@ -158,6 +158,10 @@ final class LauncherViewModel {
         selectedIndex     = 0
         clipSelectedIndex = 0
         resolveUtility()
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty {
+            AnalyticsService.logSearchQuery(length: trimmed.count)
+        }
         Task {
             results = await engine.search(query: searchQuery)
             instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
@@ -183,6 +187,7 @@ final class LauncherViewModel {
         utilityIsLoading = false
         utilityError = nil
         utilityResult = UtilityParser.parse(searchQuery)
+        trackUtilityResult(utilityResult)
     }
 
     private func resolveCurrencyUtility(_ query: CurrencyQuery) {
@@ -213,12 +218,14 @@ final class LauncherViewModel {
                 utilityIsLoading = false
                 utilityError = nil
                 utilityResult = result
+                trackUtilityResult(result)
             } catch {
                 guard !Task.isCancelled else { return }
                 utilityIsLoading = false
                 if let fallback = service.peekCached(query: query) {
                     utilityError = "Offline — showing cached rate"
                     utilityResult = fallback
+                    trackUtilityResult(fallback)
                 } else {
                     utilityError = error.localizedDescription
                     utilityResult = nil
@@ -271,6 +278,7 @@ final class LauncherViewModel {
 
     func switchPanel() {
         activePanel = (activePanel == .apps) ? .clipboard : .apps
+        AnalyticsService.logLauncherPanelSwitched(panel: activePanel == .apps ? "apps" : "clipboard")
         if activePanel == .clipboard { clipSelectedIndex = 0 }
     }
 
@@ -326,6 +334,7 @@ final class LauncherViewModel {
     // MARK: - Actions
 
     func openDomain() {
+        AnalyticsService.logDomainOpened()
         var raw = searchQuery.trimmingCharacters(in: .whitespaces)
         if !raw.hasPrefix("http://") && !raw.hasPrefix("https://") {
             raw = "https://" + raw
@@ -338,6 +347,7 @@ final class LauncherViewModel {
     func searchGoogle() {
         Task { await InstantSearchUsageStore.shared.recordGoogleOpen() }
         if isDomainQuery { openDomain(); return }
+        AnalyticsService.logGoogleSearchOpened()
         guard !searchQuery.isEmpty,
               let encoded = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://www.google.com/search?q=\(encoded)")
@@ -348,6 +358,7 @@ final class LauncherViewModel {
 
     func openInstantSearch() {
         guard let url = instantSearchTargetURL else { return }
+        AnalyticsService.logInstantSearchOpened()
         instantSearchSession.load(url)
         isInstantSearchOpen = true
         onInstantSearchChanged?(true)
@@ -358,6 +369,7 @@ final class LauncherViewModel {
     func closeInstantSearch() {
         guard isInstantSearchOpen else { return }
         isInstantSearchOpen = false
+        AnalyticsService.logInstantSearchClosed()
         onInstantSearchChanged?(false)
     }
 
@@ -409,7 +421,7 @@ final class LauncherViewModel {
     func copyClip(_ clip: Clip) {
         guard let clipVM else { return }
         copiedClipID = clip.id
-        clipVM.copyForPaste(clip)
+        clipVM.copyForPaste(clip, surface: "launcher")
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -419,7 +431,7 @@ final class LauncherViewModel {
     func copyClipAsPlainText(_ clip: Clip) {
         guard let clipVM, clip.supportsPlainTextCopy else { return }
         copiedClipID = clip.id
-        clipVM.copyToPasteboardAsPlainText(clip)
+        clipVM.copyToPasteboardAsPlainText(clip, surface: "launcher")
         Task {
             try? await Task.sleep(for: .milliseconds(420))
             dismiss()
@@ -428,6 +440,7 @@ final class LauncherViewModel {
 
     func copyUtilityResult() {
         guard let result = utilityResult, !result.copyText.isEmpty, !utilityIsLoading, let clipVM else { return }
+        AnalyticsService.logUtilityResultCopied(kind: result.kind.rawValue)
         clipVM.copyPlainTextSuppressingCapture(result.copyText)
         Task {
             try? await Task.sleep(for: .milliseconds(420))
@@ -436,6 +449,10 @@ final class LauncherViewModel {
     }
 
     func launchApp(_ app: AppInfo) {
+        AnalyticsService.logAppLaunchedFromLauncher(
+            bundleID: app.bundleIdentifier,
+            appName: app.name
+        )
         if let bid = app.bundleIdentifier {
             Task { await engine.recordUsage(bundleID: bid) }
         }
@@ -474,6 +491,11 @@ final class LauncherViewModel {
     }
 
     func openTab(_ tab: BrowserTab) {
+        AnalyticsService.logTabOpenedFromLauncher(
+            tabType: tab.isSaved ? "saved" : "live",
+            browser: tab.browser.rawValue,
+            source: isSearching ? "search_results" : "default_list"
+        )
         Task {
             await tabStore.touch(url: tab.url)
             if tab.isSaved {
@@ -514,7 +536,13 @@ final class LauncherViewModel {
     func dismiss() { onDismiss?() }
 
     func openDashboard() {
+        AnalyticsService.logDashboardOpened(source: "launcher_button", section: "main")
         onOpenDashboard?()
+    }
+
+    private func trackUtilityResult(_ result: UtilityResult?) {
+        guard let result else { return }
+        AnalyticsService.logUtilityResultShown(kind: result.kind.rawValue)
     }
 
     func expand() {

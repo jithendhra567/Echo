@@ -6,8 +6,17 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		09380F4189B7CF1B0409E723 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 6DB3CF325976EDAF13718133 /* Sparkle */; };
+		24C66DFFA39766AF0CD42C0F /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 1152116030B405BA5109DA70 /* FirebaseRemoteConfig */; };
+		DFAA2F0206EFC90DEC742284 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 98BDEE2818E537DEE8DFE2AD /* FirebaseAnalytics */; };
+		E3BE19127458FEB18BF1EA31 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 776E6EAC7DE650F1A696B4D0 /* FirebaseCore */; };
+		EB4155A37471A168BAF88400 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C7E9258C2582679A87B204EC /* GoogleService-Info.plist */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		742C64E42FAC05E800C7F298 /* Echo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C7E9258C2582679A87B204EC /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = text.plist; name = "GoogleService-Info.plist"; path = "Echo/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +32,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DFAA2F0206EFC90DEC742284 /* FirebaseAnalytics in Frameworks */,
+				24C66DFFA39766AF0CD42C0F /* FirebaseRemoteConfig in Frameworks */,
+				E3BE19127458FEB18BF1EA31 /* FirebaseCore in Frameworks */,
+				09380F4189B7CF1B0409E723 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -34,6 +47,7 @@
 			children = (
 				742C64E62FAC05E800C7F298 /* Echo */,
 				742C64E52FAC05E800C7F298 /* Products */,
+				C7E9258C2582679A87B204EC /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -65,6 +79,10 @@
 			);
 			name = Echo;
 			packageProductDependencies = (
+				98BDEE2818E537DEE8DFE2AD /* FirebaseAnalytics */,
+				1152116030B405BA5109DA70 /* FirebaseRemoteConfig */,
+				776E6EAC7DE650F1A696B4D0 /* FirebaseCore */,
+				6DB3CF325976EDAF13718133 /* Sparkle */,
 			);
 			productName = Echo;
 			productReference = 742C64E42FAC05E800C7F298 /* Echo.app */;
@@ -94,6 +112,10 @@
 			);
 			mainGroup = 742C64DB2FAC05E800C7F298;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1FC90E6D099101D1C0180F1B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				D17AF1EC5AAE51F17CD22682 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 742C64E52FAC05E800C7F298 /* Products */;
 			projectDirPath = "";
@@ -109,6 +131,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB4155A37471A168BAF88400 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,6 +269,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39J95GJUA7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -253,7 +277,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sense.Echo;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = com.echo.bar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -273,6 +298,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 39J95GJUA7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -280,7 +306,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sense.Echo;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = com.echo.bar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -315,6 +342,48 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1FC90E6D099101D1C0180F1B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.9.0;
+			};
+		};
+		D17AF1EC5AAE51F17CD22682 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1152116030B405BA5109DA70 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1FC90E6D099101D1C0180F1B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
+		};
+		6DB3CF325976EDAF13718133 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D17AF1EC5AAE51F17CD22682 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		776E6EAC7DE650F1A696B4D0 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1FC90E6D099101D1C0180F1B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		98BDEE2818E537DEE8DFE2AD /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1FC90E6D099101D1C0180F1B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 742C64DC2FAC05E800C7F298 /* Project object */;
 }

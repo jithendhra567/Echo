@@ -273,6 +273,7 @@ private struct ClockMirrorColumn: View {
         VStack(alignment: .center, spacing: 0) {
             if !mirrorRevealed {
                 Button {
+                    AnalyticsService.logMirrorRevealed()
                     mirrorRevealed = true
                     capture.startIfNeeded()
                 } label: {
@@ -331,6 +332,7 @@ private struct ClockMirrorColumn: View {
                         Spacer(minLength: 0)
                     }
                     Button {
+                        AnalyticsService.logMirrorHidden()
                         mirrorRevealed = false
                         capture.stop()
                     } label: {

@@ -74,12 +74,16 @@ final class NotchViewModel {
     // Idempotent — these are called repeatedly from drag callbacks and hover
     // events. Assigning the same value to an @Observable property still emits
     // a change notification, which would force SwiftUI to re-run the body.
-    func open() {
+    func open(trigger: String = "unknown") {
         guard notchState != .open else { return }
         notchState = .open
+        AnalyticsService.logNotchOpened(trigger: trigger)
+        AnalyticsService.logNotchModuleShown(module: activeModule.id)
     }
-    func close() {
+
+    func close(trigger: String = "unknown") {
         guard notchState != .closed else { return }
         notchState = .closed
+        AnalyticsService.logNotchClosed(trigger: trigger)
     }
 }

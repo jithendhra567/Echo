@@ -34,15 +34,18 @@ final class NotchMirrorCapture {
                         self.configureAndStart()
                     } else {
                         self.phase = .unauthorized
+                        AnalyticsService.logMirrorCameraStarted(outcome: "unauthorized")
                     }
                 }
             }
             return
         case .denied, .restricted:
             phase = .unauthorized
+            AnalyticsService.logMirrorCameraStarted(outcome: "unauthorized")
             return
         @unknown default:
             phase = .unauthorized
+            AnalyticsService.logMirrorCameraStarted(outcome: "unauthorized")
             return
         }
         configureAndStart()
@@ -73,6 +76,7 @@ final class NotchMirrorCapture {
 
         guard let device = AVCaptureDevice.default(for: .video) else {
             phase = .noCamera
+            AnalyticsService.logMirrorCameraStarted(outcome: "no_camera")
             return
         }
 
@@ -85,18 +89,21 @@ final class NotchMirrorCapture {
             guard session.canAddInput(input) else {
                 session.commitConfiguration()
                 phase = .failed("Cannot open camera")
+                AnalyticsService.logMirrorCameraStarted(outcome: "failed")
                 return
             }
             session.addInput(input)
         } catch {
             session.commitConfiguration()
             phase = .failed(error.localizedDescription)
+            AnalyticsService.logMirrorCameraStarted(outcome: "failed")
             return
         }
 
         session.commitConfiguration()
         self.session = session
         phase = .running
+        AnalyticsService.logMirrorCameraStarted(outcome: "success")
 
         sessionQueue.async {
             session.startRunning()

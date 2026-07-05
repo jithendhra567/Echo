@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>Echo Updates</title>
+        <link>https://github.com/jithendhra567/Echo</link>
+        <description>Echo macOS app release feed for Sparkle auto-updates.</description>
+        <language>en</language>
+        <item>
+            <title>Version 1.0</title>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+            <pubDate>Sun, 05 Jul 2026 00:00:00 +0000</pubDate>
+            <enclosure
+                url="https://github.com/jithendhra567/Echo/releases/download/v1.0/Echo-1.0.dmg"
+                sparkle:edSignature="REPLACE_WITH_SIGN_UPDATE_OUTPUT"
+                length="0"
+                type="application/octet-stream" />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+    </channel>
+</rss>

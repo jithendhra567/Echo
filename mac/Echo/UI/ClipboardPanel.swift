@@ -121,6 +121,7 @@ final class ClipboardPanel: NSPanel {
         hideTask?.cancel()
 
         isShowing = false
+        AnalyticsService.logClipboardPanelClosed()
         tearDownKeyMonitor()
         tearDownScrollMonitor()
         tearDownDragMouseMonitor()

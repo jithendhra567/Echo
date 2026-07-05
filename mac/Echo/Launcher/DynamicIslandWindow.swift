@@ -15,6 +15,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     let viewModel = LauncherViewModel()
     private let clipViewModel: ClipViewModel
     private let notchLayoutGuide: NotchLayoutGuide
+    private let remoteConfig: RemoteConfigService
     nonisolated(unsafe) private var topInsetObserver: NSObjectProtocol?
     private var localKeyMonitor: Any?
     private var hideTask: Task<Void, Never>?
@@ -26,9 +27,10 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     static let windowSize = CGSize(width: 860, height: 600)
 
-    init(clipViewModel: ClipViewModel, notchLayoutGuide: NotchLayoutGuide) {
+    init(clipViewModel: ClipViewModel, notchLayoutGuide: NotchLayoutGuide, remoteConfig: RemoteConfigService) {
         self.clipViewModel = clipViewModel
         self.notchLayoutGuide = notchLayoutGuide
+        self.remoteConfig = remoteConfig
         super.init(
             contentRect: NSRect(origin: .zero, size: Self.windowSize),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -41,6 +43,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
                 .environment(viewModel)
                 .environment(clipViewModel)
                 .environment(viewModel.instantSearchSession)
+                .environment(remoteConfig)
         )
         viewModel.onDismiss      = { [weak self] in self?.hide() }
         viewModel.onLaunch       = { [weak self] in self?.hideAfterLaunch() }
@@ -156,6 +159,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         hideTask = nil
 
         isShowing   = true
+        AnalyticsService.logLauncherOpened()
         suppressDismissUntil = Date().addingTimeInterval(0.5)
         viewModel.reset()          // resets isVisible=false, isExpanded=false
         reposition()
@@ -185,6 +189,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     func hide() {
         guard isShowing else { return }
         isShowing = false
+        AnalyticsService.logLauncherClosed()
         tearDownKeyMonitor()
         suppressDismissUntil = nil
         hideTask?.cancel()

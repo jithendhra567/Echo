@@ -75,6 +75,14 @@ final class ClipboardMonitor {
         guard !settings.isClipboardPaused else { return }
         guard let clip = capture(from: pb) else { return }
         Task { @MainActor in
+            if clip.isLink,
+               let url = clip.linkURLString,
+               await ArcBrowserPrivacy.shouldSkipLinkCapture(
+                   sourceBundle: clip.sourceAppBundle,
+                   url: url
+               ) {
+                return
+            }
             let result = await store.save(clip)
             onNewClip?(clip, result)
         }
