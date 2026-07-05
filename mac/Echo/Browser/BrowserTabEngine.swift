@@ -322,7 +322,6 @@ final class BrowserTabEngine: Sendable {
                     guard !Self.isInternalURL(url) else { continue }
 
                     tabs.append(BrowserTab(
-                        id: UUID(),
                         title: title,
                         url: url,
                         browser: browser,

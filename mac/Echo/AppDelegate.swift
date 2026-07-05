@@ -53,7 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherPanel.viewModel.onOpenDashboard = { [weak self] in self?.openDashboard() }
         launcherPanel.onDidBecomeKey = { [weak self] in
             // Spotlight-style search must not pull an open Dashboard window forward.
-            self?.dashboardWindow?.orderBack(nil)
+            // Only demote it if it's actually on screen — orderBack on a closed
+            // window would re-show it.
+            if let dashboard = self?.dashboardWindow, dashboard.isVisible {
+                dashboard.orderBack(nil)
+            }
         }
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }

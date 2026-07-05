@@ -72,7 +72,7 @@ actor BrowserTabStore {
                   let browser   = BrowserTab.Browser(rawValue: rawBsr)
             else { continue }
             guard !AppSettings.isWebsiteIgnored(url) else { continue }
-            tabs.append(BrowserTab(id: UUID(), title: title, url: url, browser: browser, isSaved: true))
+            tabs.append(BrowserTab(title: title, url: url, browser: browser, isSaved: true))
         }
         return tabs
     }

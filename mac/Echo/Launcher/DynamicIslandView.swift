@@ -34,6 +34,8 @@ struct DynamicIslandView: View {
 
     private static let launcherSpring = Animation.spring(response: 0.34, dampingFraction: 0.78)
     private static let launcherSpringBouncy = Animation.spring(response: 0.34, dampingFraction: 0.72)
+    /// Quick spring for result rows re-sorting as the user types.
+    private static let listSpring = Animation.spring(response: 0.28, dampingFraction: 0.86)
     /// Single spring for open/close — matched to `DynamicIslandWindow.show()`.
     private static let openSpring = Animation.spring(response: 0.38, dampingFraction: 0.88)
 
@@ -403,10 +405,29 @@ struct DynamicIslandView: View {
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
+                    .animation(Self.listSpring, value: appListAnimationKey)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Identity of every visible row in the apps column, in display order.
+    /// Rows keep their IDs across keystrokes, so animating on this key makes
+    /// SwiftUI slide surviving rows to their new positions instead of redrawing.
+    private var appListAnimationKey: [String] {
+        var key: [String] = []
+        if vm.showsUtilityRow { key.append("utility") }
+        if vm.showsGoogleFallback {
+            key.append(vm.instantSearchFirst ? "fallback-instant-first" : "fallback-google-first")
+        }
+        if vm.isSearching {
+            key.append(contentsOf: vm.mixedSearchResults.map(\.id))
+        } else {
+            key.append(contentsOf: vm.results.map { "app-\($0.id.uuidString)" })
+            key.append(contentsOf: vm.defaultTabResults.map { "tab-\($0.id)" })
+        }
+        return key
     }
 
     @ViewBuilder
@@ -541,6 +562,7 @@ struct DynamicIslandView: View {
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
+                    .animation(Self.listSpring, value: clips.map(\.id))
                 }
             }
         }

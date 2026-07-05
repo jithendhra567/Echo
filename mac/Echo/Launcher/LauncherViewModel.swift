@@ -8,7 +8,7 @@ enum LauncherSearchItem: Identifiable {
     var id: String {
         switch self {
         case .app(let app): return "app-\(app.id.uuidString)"
-        case .tab(let tab): return "tab-\(tab.id.uuidString)"
+        case .tab(let tab): return "tab-\(tab.id)"
         }
     }
 }
