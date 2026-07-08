@@ -2,13 +2,9 @@
 ---
 
 <section id="download" aria-labelledby="dl-title">
-
-  <!-- Top divider glow -->
   <div class="dl-glow" aria-hidden="true"></div>
 
   <div class="dl-wrap">
-
-    <!-- Echo icon -->
     <div class="dl-icon reveal" aria-hidden="true">
       <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
         <circle cx="36" cy="36" r="35" fill="rgba(167,139,250,0.06)" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
@@ -18,7 +14,6 @@
       </svg>
     </div>
 
-    <!-- Heading -->
     <div class="dl-head reveal">
       <h2 id="dl-title" class="dl-h2">
         Ready when<br />
@@ -30,23 +25,19 @@
       </p>
     </div>
 
-    <!-- Download buttons -->
     <div class="dl-buttons reveal">
-      <a href="#" class="dl-btn primary btn-magnetic" aria-label="Download Echo for Apple Silicon Mac">
+      <a href="#" class="dl-btn primary" aria-label="Download Echo for Apple Silicon Mac">
         <div class="dl-btn-icon" aria-hidden="true">
-          <!-- Apple Silicon chip icon -->
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="6" y="6" width="8" height="8" rx="2" fill="currentColor"/>
             <rect x="4" y="1" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="9.25" y="1" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="14.5" y="4" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="14.5" y="9.25" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
-            <rect x="14.5" y="14.5" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="4" y="14.5" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="9.25" y="14.5" width="1.5" height="3" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="2.5" y="4" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
             <rect x="2.5" y="9.25" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
-            <rect x="2.5" y="14.5" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.5"/>
           </svg>
         </div>
         <div class="dl-btn-text">
@@ -56,12 +47,10 @@
         <div class="dl-btn-arrow" aria-hidden="true">↓</div>
       </a>
 
-      <a href="#" class="dl-btn secondary btn-magnetic" aria-label="Download Echo for Intel Mac">
+      <a href="#" class="dl-btn secondary" aria-label="Download Echo for Intel Mac">
         <div class="dl-btn-icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M7 5V4a1 1 0 011-1h4a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M7 15v1a1 1 0 001 1h4a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <rect x="7" y="8" width="6" height="4" rx="1" fill="currentColor" opacity="0.3"/>
           </svg>
         </div>
@@ -73,7 +62,6 @@
       </a>
     </div>
 
-    <!-- Meta info -->
     <div class="dl-meta reveal">
       <span class="dl-version">Version 1.0.0</span>
       <span class="dl-sep" aria-hidden="true">·</span>
@@ -82,7 +70,6 @@
       <span>Free</span>
     </div>
 
-    <!-- System requirements -->
     <div class="dl-reqs reveal">
       <details class="reqs-details">
         <summary class="reqs-summary">System requirements</summary>
@@ -95,14 +82,13 @@
         </ul>
       </details>
     </div>
-
   </div>
 </section>
 
 <style>
   #download {
     position: relative;
-    padding: 140px 24px 120px;
+    padding: 150px 24px 120px;
     text-align: center;
     overflow: hidden;
   }
@@ -135,14 +121,8 @@
     gap: 32px;
   }
 
-  /* Icon */
-  .dl-icon {
-    width: 72px;
-    height: 72px;
-    animation: float-c 4s ease-in-out infinite;
-  }
+  .dl-icon { width: 72px; height: 72px; }
 
-  /* Heading */
   .dl-head { margin-bottom: 8px; }
 
   .dl-h2 {
@@ -150,13 +130,13 @@
     font-weight: 900;
     letter-spacing: -0.045em;
     line-height: 1.04;
-    color: #fafafa;
+    color: var(--text-1);
     margin: 0 0 20px;
   }
 
   .dl-sub {
     font-size: 17px;
-    color: #71717a;
+    color: var(--text-2);
     line-height: 1.65;
     margin: 0;
   }
@@ -168,14 +148,11 @@
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 6px;
     font-size: 14px;
-    color: #a1a1aa;
+    color: var(--text-2);
     font-style: normal;
-    letter-spacing: 0.01em;
     font-family: var(--font);
-    vertical-align: baseline;
   }
 
-  /* Download buttons */
   .dl-buttons {
     display: flex;
     gap: 14px;
@@ -195,27 +172,26 @@
   }
 
   .dl-btn.primary {
-    background: #a78bfa;
-    color: #09090b;
-    box-shadow: 0 0 40px rgba(139,92,246,0.35), 0 4px 24px rgba(0,0,0,0.3);
+    background: var(--text-1);
+    color: #050507;
+    box-shadow: 0 0 40px rgba(167,139,250,0.25), 0 4px 24px rgba(0,0,0,0.3);
   }
 
   .dl-btn.primary:hover {
-    background: #c4b5fd;
-    box-shadow: 0 0 60px rgba(139,92,246,0.5), 0 4px 24px rgba(0,0,0,0.3);
+    box-shadow: 0 0 60px rgba(167,139,250,0.4), 0 4px 24px rgba(0,0,0,0.3);
     transform: translateY(-2px);
   }
 
   .dl-btn.secondary {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.10);
-    color: #a1a1aa;
+    color: var(--text-2);
   }
 
   .dl-btn.secondary:hover {
     background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.16);
-    color: #fafafa;
+    border-color: var(--border-hi);
+    color: var(--text-1);
     transform: translateY(-2px);
   }
 
@@ -225,14 +201,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.12);
+    background: rgba(0,0,0,0.1);
     border-radius: 10px;
     flex-shrink: 0;
   }
 
-  .dl-btn.secondary .dl-btn-icon {
-    background: rgba(255,255,255,0.07);
-  }
+  .dl-btn.secondary .dl-btn-icon { background: rgba(255,255,255,0.07); }
 
   .dl-btn-text {
     display: flex;
@@ -241,44 +215,23 @@
     flex: 1;
   }
 
-  .dl-btn-label {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
+  .dl-btn-label { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .dl-btn-sub   { font-size: 12px; opacity: 0.65; font-weight: 500; }
+  .dl-btn-arrow { font-size: 18px; font-weight: 300; opacity: 0.7; flex-shrink: 0; }
 
-  .dl-btn-sub {
-    font-size: 12px;
-    opacity: 0.65;
-    font-weight: 500;
-  }
-
-  .dl-btn-arrow {
-    font-size: 18px;
-    font-weight: 300;
-    opacity: 0.7;
-    flex-shrink: 0;
-  }
-
-  /* Meta */
   .dl-meta {
     display: flex;
     align-items: center;
     gap: 10px;
     font-size: 12.5px;
-    color: #3f3f46;
+    color: var(--text-3);
     flex-wrap: wrap;
     justify-content: center;
   }
 
-  .dl-version {
-    color: #52525b;
-    font-weight: 600;
-  }
+  .dl-version { color: var(--text-2); font-weight: 600; }
+  .dl-sep     { color: #27272a; }
 
-  .dl-sep { color: #27272a; }
-
-  /* Requirements */
   .dl-reqs { width: 100%; max-width: 400px; }
 
   .reqs-details {
@@ -290,7 +243,7 @@
   .reqs-summary {
     padding: 12px 18px;
     font-size: 13px;
-    color: #52525b;
+    color: var(--text-3);
     font-weight: 500;
     cursor: pointer;
     list-style: none;
@@ -300,7 +253,7 @@
     transition: color 0.2s;
   }
 
-  .reqs-summary:hover { color: #a1a1aa; }
+  .reqs-summary:hover { color: var(--text-2); }
 
   .reqs-summary::before {
     content: '›';
@@ -317,11 +270,12 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    text-align: left;
   }
 
   .reqs-list li {
     font-size: 12.5px;
-    color: #52525b;
+    color: var(--text-3);
     line-height: 1.5;
   }
 

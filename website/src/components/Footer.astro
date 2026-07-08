@@ -6,7 +6,6 @@ const year = new Date().getFullYear();
   <div class="ft-top-line" aria-hidden="true"></div>
 
   <div class="ft-wrap">
-    <!-- Brand -->
     <div class="ft-brand">
       <a href="/" class="ft-logo" aria-label="Echo home">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -16,41 +15,25 @@ const year = new Date().getFullYear();
         </svg>
         Echo
       </a>
-      <p class="ft-tagline">Clipboard. Launcher. Notch.</p>
-
-      <!-- Socials -->
-      <div class="ft-socials" role="list" aria-label="Social links">
-        <a href="#" class="ft-social" role="listitem" aria-label="GitHub" target="_blank" rel="noopener noreferrer">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
-          </svg>
-        </a>
-        <a href="#" class="ft-social" role="listitem" aria-label="Twitter / X" target="_blank" rel="noopener noreferrer">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-          </svg>
-        </a>
-      </div>
+      <p class="ft-tagline">Clipboard. Launcher. Notch.<br />One keystroke.</p>
     </div>
 
-    <!-- Links -->
     <nav class="ft-nav" aria-label="Footer navigation">
       <div class="ft-col">
         <span class="ft-col-title">Product</span>
         <ul role="list">
+          <li><a href="#launcher">Launcher</a></li>
+          <li><a href="#clipboard">Clipboard</a></li>
+          <li><a href="#notch">Notch</a></li>
           <li><a href="#features">Features</a></li>
-          <li><a href="#demo">How it works</a></li>
           <li><a href="#download">Download</a></li>
-          <li><a href="#">Changelog</a></li>
         </ul>
       </div>
 
       <div class="ft-col">
         <span class="ft-col-title">Resources</span>
         <ul role="list">
-          <li><a href="#">Documentation</a></li>
           <li><a href="#">Release notes</a></li>
-          <li><a href="#">GitHub</a></li>
           <li><a href="#">Feedback</a></li>
         </ul>
       </div>
@@ -60,18 +43,14 @@ const year = new Date().getFullYear();
         <ul role="list">
           <li><a href="#">Privacy policy</a></li>
           <li><a href="#">Terms of use</a></li>
-          <li><a href="#">Open source</a></li>
         </ul>
       </div>
     </nav>
   </div>
 
-  <!-- Bottom bar -->
   <div class="ft-bottom">
     <p class="ft-copy">© {year} Echo. Made for Mac.</p>
-    <p class="ft-made">
-      Built with Swift &amp; love.
-    </p>
+    <p class="ft-made">Built with Swift &amp; love.</p>
   </div>
 </footer>
 
@@ -93,15 +72,13 @@ const year = new Date().getFullYear();
   }
 
   .ft-wrap {
-    max-width: 1160px;
-    margin: 0 auto;
+    max-width: 1100px;
+    margin: 0 auto 60px;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 80px;
-    margin-bottom: 60px;
   }
 
-  /* Brand */
   .ft-brand {
     display: flex;
     flex-direction: column;
@@ -113,49 +90,19 @@ const year = new Date().getFullYear();
     align-items: center;
     gap: 8px;
     text-decoration: none;
-    color: #fafafa;
+    color: var(--text-1);
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.01em;
-    margin-bottom: 4px;
   }
 
   .ft-tagline {
     font-size: 13px;
-    color: #52525b;
+    color: var(--text-3);
     margin: 0;
-    line-height: 1.5;
-    max-width: 200px;
+    line-height: 1.6;
   }
 
-  /* Socials */
-  .ft-socials {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .ft-social {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #71717a;
-    text-decoration: none;
-    transition: all 0.2s;
-  }
-
-  .ft-social:hover {
-    background: rgba(255,255,255,0.09);
-    color: #fafafa;
-    border-color: rgba(255,255,255,0.14);
-  }
-
-  /* Navigation */
   .ft-nav {
     display: flex;
     gap: 64px;
@@ -168,7 +115,7 @@ const year = new Date().getFullYear();
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #3f3f46;
+    color: var(--text-3);
   }
 
   .ft-col ul {
@@ -183,16 +130,15 @@ const year = new Date().getFullYear();
   .ft-col a {
     text-decoration: none;
     font-size: 13.5px;
-    color: #71717a;
+    color: var(--text-2);
     transition: color 0.2s;
     line-height: 1;
   }
 
-  .ft-col a:hover { color: #fafafa; }
+  .ft-col a:hover { color: var(--text-1); }
 
-  /* Bottom */
   .ft-bottom {
-    max-width: 1160px;
+    max-width: 1100px;
     margin: 0 auto;
     padding-top: 28px;
     border-top: 1px solid rgba(255,255,255,0.05);
@@ -204,25 +150,13 @@ const year = new Date().getFullYear();
 
   .ft-copy, .ft-made {
     font-size: 12px;
-    color: #3f3f46;
+    color: var(--text-3);
     margin: 0;
   }
 
-  /* Responsive */
   @media (max-width: 768px) {
-    .ft-wrap {
-      grid-template-columns: 1fr;
-      gap: 48px;
-    }
-
-    .ft-nav {
-      gap: 40px;
-      flex-wrap: wrap;
-    }
-
-    .ft-bottom {
-      flex-direction: column;
-      text-align: center;
-    }
+    .ft-wrap { grid-template-columns: 1fr; gap: 48px; }
+    .ft-nav { gap: 40px; flex-wrap: wrap; }
+    .ft-bottom { flex-direction: column; text-align: center; }
   }
 </style>

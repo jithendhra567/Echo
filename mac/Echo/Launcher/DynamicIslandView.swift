@@ -21,6 +21,7 @@ extension DynamicIslandView {
 
 struct DynamicIslandView: View {
     @Environment(LauncherViewModel.self) private var vm
+    @Environment(LauncherSettings.self) private var launcherSettings
     @Environment(ClipViewModel.self)     private var clipVM
     @Environment(InstantSearchSession.self) private var instantSession
     @Environment(RemoteConfigService.self) private var remoteConfig
@@ -103,6 +104,15 @@ struct DynamicIslandView: View {
                 isSearchFocused = false
                 showTimestamps = false
             }
+        }
+        .onChange(of: launcherSettings.showTabsInSearch) { _, enabled in
+            if enabled {
+                vm.warmTabsCache()
+                if vm.isExpanded { vm.expand() }
+            } else {
+                vm.clearTabResults()
+            }
+            vm.search()
         }
         .onChange(of: vm.isInstantSearchOpen) { _, open in
             if open {
@@ -220,6 +230,7 @@ struct DynamicIslandView: View {
                             .frame(width: 1)
                         clipColumn
                     }
+                    .frame(maxHeight: .infinity)
                 }
                 .transition(.opacity)
             }
@@ -329,7 +340,8 @@ struct DynamicIslandView: View {
         let calcOffset = vm.utilityRowCount
         let hasContent = vm.isSearching
             ? !vm.mixedSearchResults.isEmpty
-            : !vm.results.isEmpty || !vm.defaultTabResults.isEmpty || (vm.tabsAreLoading && vm.defaultTabResults.isEmpty)
+            : !vm.results.isEmpty
+                || (launcherSettings.showTabsInSearch && (!vm.defaultTabResults.isEmpty || vm.tabsAreLoading))
         return VStack(spacing: 0) {
             sectionLabel(vm.isSearching ? "RESULTS" : "APPS", active: vm.activePanel == .apps)
 
@@ -382,7 +394,8 @@ struct DynamicIslandView: View {
                                 .onHover { if $0 && !vm.ignoreHover { vm.selectedIndex = globalIdx } }
                             }
 
-                            if !vm.defaultTabResults.isEmpty || vm.tabsAreLoading {
+                            if launcherSettings.showTabsInSearch,
+                               !vm.defaultTabResults.isEmpty || vm.tabsAreLoading {
                                 tabsSectionLabel
                                     .padding(.top, 4)
 
@@ -407,6 +420,7 @@ struct DynamicIslandView: View {
                     .padding(.vertical, 4)
                     .animation(Self.listSpring, value: appListAnimationKey)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -425,7 +439,9 @@ struct DynamicIslandView: View {
             key.append(contentsOf: vm.mixedSearchResults.map(\.id))
         } else {
             key.append(contentsOf: vm.results.map { "app-\($0.id.uuidString)" })
-            key.append(contentsOf: vm.defaultTabResults.map { "tab-\($0.id)" })
+            if launcherSettings.showTabsInSearch {
+                key.append(contentsOf: vm.defaultTabResults.map { "tab-\($0.id)" })
+            }
         }
         return key
     }
@@ -564,6 +580,7 @@ struct DynamicIslandView: View {
                     .padding(.vertical, 4)
                     .animation(Self.listSpring, value: clips.map(\.id))
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

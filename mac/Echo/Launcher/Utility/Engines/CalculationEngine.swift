@@ -71,7 +71,9 @@ enum CalculationEngine {
     }()
 
     private static func evaluateArithmetic(_ norm: UtilityQueryNormalizer.NormalizedQuery) -> UtilityResult? {
-        let expression = UtilityQueryNormalizer.stripCommasForMath(norm.expression)
+        let expression = coerceIntegerLiteralsToDouble(
+            UtilityQueryNormalizer.stripCommasForMath(norm.expression)
+        )
         guard !expression.isEmpty else { return nil }
         guard expression.unicodeScalars.allSatisfy({ allowedCharset.contains($0) }) else { return nil }
         guard looksIntentionalArithmetic(expression, hasLeadingEquals: norm.hasLeadingEquals) else { return nil }
@@ -102,6 +104,28 @@ enum CalculationEngine {
     }
 
     // MARK: - Helpers
+
+    /// NSExpression uses integer division for whole-number literals (`10/4` → 2). Append `.0` so
+    /// operands are evaluated as floating point (`10.0/4.0` → 2.5).
+    private static func coerceIntegerLiteralsToDouble(_ expression: String) -> String {
+        guard let re = try? NSRegularExpression(pattern: #"(?<![.\d])(\d+)(?![.\d])"#) else {
+            return expression
+        }
+        let ns = expression as NSString
+        let matches = re.matches(in: expression, range: NSRange(location: 0, length: ns.length))
+        guard !matches.isEmpty else { return expression }
+
+        var result = ""
+        var lastEnd = expression.startIndex
+        for m in matches {
+            guard let intRange = Range(m.range(at: 1), in: expression) else { continue }
+            result += expression[lastEnd..<intRange.lowerBound]
+            result += expression[intRange] + ".0"
+            lastEnd = intRange.upperBound
+        }
+        result += expression[lastEnd...]
+        return result
+    }
 
     nonisolated static func formatNumber(_ value: Double) -> String {
         if value.rounded(.towardZero) == value, abs(value) < 1e15 {

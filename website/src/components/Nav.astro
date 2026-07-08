@@ -3,11 +3,8 @@
 
 <header id="nav" role="banner">
   <nav class="nav-inner" aria-label="Main navigation">
-
-    <!-- Logo -->
     <a href="/" class="nav-logo" aria-label="Echo home">
-      <!-- Echo sonar-ring icon (SVG) -->
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true">
         <path d="M6 14 A10 10 0 0 1 22 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" opacity="0.35"/>
         <path d="M9 14 A7  7  0 0 1 19 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" opacity="0.65"/>
         <path d="M12 14 A4  4  0 0 1 16 14" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/>
@@ -15,33 +12,25 @@
       <span>Echo</span>
     </a>
 
-    <!-- Links -->
     <ul class="nav-links" role="list">
+      <li><a href="#launcher">Launcher</a></li>
+      <li><a href="#clipboard">Clipboard</a></li>
+      <li><a href="#notch">Notch</a></li>
       <li><a href="#features">Features</a></li>
-      <li><a href="#demo">How it works</a></li>
-      <li><a href="#download">Download</a></li>
     </ul>
 
-    <!-- CTA -->
-    <a href="#download" class="nav-cta" aria-label="Download Echo">
-      Download
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-        <path d="M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M2 11h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
-    </a>
+    <a href="#download" class="nav-cta" aria-label="Download Echo">Download</a>
 
-    <!-- Mobile menu toggle -->
     <button class="nav-menu-btn" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
-      <span></span><span></span><span></span>
+      <span></span><span></span>
     </button>
   </nav>
 
-  <!-- Mobile menu -->
   <div id="mobile-menu" class="mobile-menu" hidden aria-label="Mobile navigation">
+    <a href="#launcher">Launcher</a>
+    <a href="#clipboard">Clipboard</a>
+    <a href="#notch">Notch</a>
     <a href="#features">Features</a>
-    <a href="#demo">How it works</a>
-    <a href="#download">Download</a>
     <a href="#download" class="mobile-cta">Download for Mac</a>
   </div>
 </header>
@@ -58,7 +47,7 @@
   }
 
   header.scrolled {
-    background: rgba(9,9,11,0.82);
+    background: rgba(5,5,7,0.75);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     border-bottom-color: rgba(255,255,255,0.06);
@@ -68,7 +57,7 @@
     max-width: 1160px;
     margin: 0 auto;
     padding: 0 24px;
-    height: 64px;
+    height: 60px;
     display: flex;
     align-items: center;
     gap: 40px;
@@ -77,64 +66,59 @@
   .nav-logo {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     text-decoration: none;
-    color: #fafafa;
+    color: var(--text-1);
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: -0.01em;
     flex-shrink: 0;
   }
-
-  .nav-logo svg { flex-shrink: 0; }
 
   .nav-links {
     display: flex;
     list-style: none;
     margin: 0;
     padding: 0;
-    gap: 32px;
+    gap: 30px;
     flex: 1;
+    justify-content: center;
   }
 
   .nav-links a {
     text-decoration: none;
-    color: #71717a;
-    font-size: 14px;
+    color: var(--text-2);
+    font-size: 13.5px;
     font-weight: 500;
     transition: color 0.2s;
   }
 
-  .nav-links a:hover { color: #fafafa; }
+  .nav-links a:hover { color: var(--text-1); }
 
   .nav-cta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    background: rgba(167,139,250,0.12);
-    border: 1px solid rgba(167,139,250,0.25);
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 100px;
-    color: #c4b5fd;
+    color: var(--text-1);
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    transition: background 0.2s, border-color 0.2s;
     flex-shrink: 0;
     white-space: nowrap;
   }
 
   .nav-cta:hover {
-    background: rgba(167,139,250,0.2);
-    border-color: rgba(167,139,250,0.4);
-    color: #ddd6fe;
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.2);
   }
 
   .nav-menu-btn {
     display: none;
     flex-direction: column;
-    gap: 5px;
-    padding: 8px;
+    gap: 6px;
+    padding: 10px;
     background: none;
     border: none;
     cursor: pointer;
@@ -145,23 +129,22 @@
     display: block;
     width: 20px;
     height: 1.5px;
-    background: #a1a1aa;
+    background: var(--text-2);
     border-radius: 2px;
-    transition: transform 0.2s, opacity 0.2s;
   }
 
   .mobile-menu {
     display: flex;
     flex-direction: column;
-    padding: 12px 24px 24px;
-    background: rgba(9,9,11,0.96);
+    padding: 8px 24px 24px;
+    background: rgba(5,5,7,0.97);
     border-bottom: 1px solid rgba(255,255,255,0.06);
-    gap: 4px;
+    gap: 2px;
   }
 
   .mobile-menu a {
-    padding: 12px 0;
-    color: #a1a1aa;
+    padding: 13px 0;
+    color: var(--text-2);
     text-decoration: none;
     font-size: 16px;
     font-weight: 500;
@@ -169,7 +152,7 @@
     transition: color 0.2s;
   }
 
-  .mobile-menu a:hover { color: #fafafa; }
+  .mobile-menu a:hover { color: var(--text-1); }
   .mobile-menu a:last-child { border: none; }
 
   .mobile-cta {
@@ -184,20 +167,17 @@
   }
 
   @media (max-width: 768px) {
-    .nav-links { display: none; }
-    .nav-cta   { display: none; }
+    .nav-links, .nav-cta { display: none; }
     .nav-menu-btn { display: flex; }
   }
 </style>
 
 <script>
-  // Scroll-based nav background
   const header = document.getElementById('nav')!;
   window.addEventListener('scroll', () => {
     header.classList.toggle('scrolled', window.scrollY > 20);
   }, { passive: true });
 
-  // Mobile menu toggle
   const btn  = header.querySelector('.nav-menu-btn') as HTMLButtonElement;
   const menu = document.getElementById('mobile-menu')!;
   btn.addEventListener('click', () => {
@@ -206,7 +186,6 @@
     btn.setAttribute('aria-expanded', String(!open));
   });
 
-  // Close mobile menu on link click
   menu.querySelectorAll('a').forEach(a => {
     a.addEventListener('click', () => {
       menu.hidden = true;

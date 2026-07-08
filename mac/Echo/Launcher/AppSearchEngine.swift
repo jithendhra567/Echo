@@ -105,7 +105,7 @@ actor AppSearchEngine {
 
     // MARK: - Search
 
-    func search(query: String) -> [AppInfo] {
+    func search(query: String, maxResults: Int) -> [AppInfo] {
         if query.isEmpty {
             return Array(
                 allApps
@@ -118,7 +118,7 @@ actor AppSearchEngine {
                         if ldep != rdep { return !ldep }
                         return lhs.name.lowercased() < rhs.name.lowercased()
                     }
-                    .prefix(4)
+                    .prefix(maxResults)
             )
         }
 
@@ -138,7 +138,7 @@ actor AppSearchEngine {
                 if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
                 return lhs.0.name.lowercased() < rhs.0.name.lowercased()
             }
-            .prefix(5)
+            .prefix(maxResults)
             .map(\.0)
     }
 

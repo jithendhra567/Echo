@@ -88,8 +88,11 @@ private enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
 struct GeneralSettingsPane: View {
     @Environment(LauncherSettings.self) private var settings
     @Environment(LaunchAtLoginController.self) private var launchAtLogin
+    @Environment(\.showOnboardingAgain) private var showOnboardingAgain
 
     var body: some View {
+        @Bindable var settings = settings
+
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header(icon: "gearshape.fill", title: "General",
@@ -149,6 +152,43 @@ struct GeneralSettingsPane: View {
                         }
 
                         Text("Hotkey to open/close the clipboard card panel. Default: ⌘⇧V")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(8)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Launcher")
+                            .font(.headline)
+
+                        Toggle(isOn: $settings.showTabsInSearch) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Show browser tabs in search")
+                                Text("Lists open Safari, Chrome, and Arc tabs below apps in the launcher. Tab history is still saved for when you turn this back on.")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
+                .onChange(of: settings.showTabsInSearch) {
+                    AnalyticsService.logLauncherTabsInSearchChanged(enabled: settings.showTabsInSearch)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Setup")
+                            .font(.headline)
+
+                        Button("Setup again") {
+                            AnalyticsService.logOnboardingReplayed()
+                            showOnboardingAgain?()
+                        }
+
+                        Text("Reopen the welcome guide to review shortcuts and launcher options.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
@@ -993,5 +1033,18 @@ private func featureRow(icon: String, text: String) -> some View {
             .frame(width: 20)
         Text(text)
             .font(.system(size: 14))
+    }
+}
+
+// MARK: - Environment
+
+private struct ShowOnboardingAgainKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var showOnboardingAgain: (() -> Void)? {
+        get { self[ShowOnboardingAgainKey.self] }
+        set { self[ShowOnboardingAgainKey.self] = newValue }
     }
 }

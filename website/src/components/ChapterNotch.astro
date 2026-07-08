@@ -1,0 +1,218 @@
+---
+import MediaFrame from './MediaFrame.astro';
+---
+
+<section id="notch" class="chapter" data-chapter aria-labelledby="notch-title">
+  <div class="ch-bg" aria-hidden="true"></div>
+
+  <div class="ch-inner">
+    <header class="ch-head reveal">
+      <span class="eyebrow">Chapter 03 — Notch</span>
+      <h2 id="notch-title" class="h2">Dead space,<br /><em class="grad" style="font-style:normal;">brought to life.</em></h2>
+    </header>
+
+    <div class="ch-stage notch-stage" data-stage>
+      <!-- Media 0: CSS-recreated now-playing pill -->
+      <div class="ch-media" data-media-item="0">
+        <div class="np-scene" role="img" aria-label="Echo notch pill showing the currently playing track with controls">
+          <div class="np-pill notch-pill">
+            <div class="np-art" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="8" fill="rgba(255,255,255,0.12)"/>
+                <circle cx="9" cy="9" r="2.5" fill="rgba(255,255,255,0.35)"/>
+              </svg>
+            </div>
+            <div class="np-info">
+              <div class="np-track">The Chain</div>
+              <div class="np-artist">Fleetwood Mac</div>
+            </div>
+            <div class="np-eq" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="np-controls" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="#a1a1aa"><path d="M2 1.5v9L4 9V3L2 1.5zM4.5 6l6-4.5v9L4.5 6z" transform="scale(-1,1) translate(-12,0)"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="#f5f5f7"><rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="#a1a1aa"><path d="M2 1.5v9L4 9V3L2 1.5zM4.5 6l6-4.5v9L4.5 6z"/></svg>
+            </div>
+          </div>
+          <div class="np-progress" aria-hidden="true">
+            <div class="np-bar"><div class="np-fill"></div></div>
+            <div class="np-times"><span>1:42</span><span>4:28</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Media 1: tray screenshot -->
+      <div class="ch-media" data-media-item="1">
+        <MediaFrame
+          src="/media/notch-tray.png"
+          alt="Echo notch tray holding files ready to drag into any app"
+          label="Drop notch-tray.png into website/public/media/"
+          class="notch-frame"
+        />
+      </div>
+
+      <!-- Media 2: existing clock/calendar/mirror screenshot -->
+      <div class="ch-media" data-media-item="2">
+        <MediaFrame
+          src="/screenshots/notch-clock.png"
+          alt="Echo notch panel expanded to show a month calendar, digital clock with greeting, and camera mirror button"
+          label="notch-clock.png"
+          class="notch-frame"
+        />
+      </div>
+    </div>
+
+    <div class="ch-beats" data-beats>
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Any audio app</span>
+        <h3 class="ch-beat-title">Your music, in the menu bar</h3>
+        <p class="ch-beat-desc">Album art, track info, and playback controls live in the notch. No plugins, no setup — it just works.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="1">
+        <span class="ch-beat-kbd">Drag &amp; drop</span>
+        <h3 class="ch-beat-title">A shelf for your files</h3>
+        <p class="ch-beat-desc">Drop files onto the notch and they wait in the Tray. Drag them out into any app later — no Finder required.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="2">
+        <span class="ch-beat-kbd">Hover to peek</span>
+        <h3 class="ch-beat-title">Clock, calendar, greeting</h3>
+        <p class="ch-beat-desc">A glance at the notch shows the time and the full month — without ever opening Calendar.app.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="2">
+        <span class="ch-beat-kbd">One click</span>
+        <h3 class="ch-beat-title">A mirror when you need one</h3>
+        <p class="ch-beat-desc">Live front-camera preview right inside the notch — check yourself before that meeting starts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ch-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(236,72,153,0.07), transparent 65%);
+    pointer-events: none;
+  }
+
+  .notch-stage { max-width: 760px; }
+
+  :global(.notch-frame) {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ── CSS-recreated now-playing scene ── */
+  .np-scene {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 40px 0;
+  }
+
+  .np-pill {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    min-width: min(400px, 90vw);
+  }
+
+  .np-art {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(124,58,237,0.4);
+  }
+
+  .np-info { flex: 1; min-width: 0; }
+
+  .np-track {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-1);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .np-artist {
+    font-size: 11.5px;
+    color: var(--text-2);
+    margin-top: 1px;
+  }
+
+  .np-eq {
+    display: flex;
+    align-items: flex-end;
+    gap: 2.5px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .np-eq span {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--pink);
+    animation: eq-bounce 1s ease-in-out infinite;
+  }
+
+  .np-eq span:nth-child(1) { height: 60%; animation-delay: 0s; }
+  .np-eq span:nth-child(2) { height: 100%; animation-delay: 0.15s; }
+  .np-eq span:nth-child(3) { height: 45%; animation-delay: 0.3s; }
+  .np-eq span:nth-child(4) { height: 80%; animation-delay: 0.45s; }
+
+  @keyframes eq-bounce {
+    0%, 100% { transform: scaleY(1); }
+    50%       { transform: scaleY(0.45); }
+  }
+
+  .np-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    padding-left: 6px;
+    border-left: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .np-progress {
+    width: min(340px, 80vw);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .np-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.1);
+    overflow: hidden;
+  }
+
+  .np-fill {
+    width: 38%;
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #a78bfa, #ec4899);
+  }
+
+  .np-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

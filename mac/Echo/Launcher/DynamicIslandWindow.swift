@@ -16,6 +16,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
     private let clipViewModel: ClipViewModel
     private let notchLayoutGuide: NotchLayoutGuide
     private let remoteConfig: RemoteConfigService
+    private let launcherSettings: LauncherSettings
     nonisolated(unsafe) private var topInsetObserver: NSObjectProtocol?
     private var localKeyMonitor: Any?
     private var hideTask: Task<Void, Never>?
@@ -27,10 +28,11 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
 
     static let windowSize = CGSize(width: 860, height: 600)
 
-    init(clipViewModel: ClipViewModel, notchLayoutGuide: NotchLayoutGuide, remoteConfig: RemoteConfigService) {
+    init(clipViewModel: ClipViewModel, notchLayoutGuide: NotchLayoutGuide, remoteConfig: RemoteConfigService, launcherSettings: LauncherSettings) {
         self.clipViewModel = clipViewModel
         self.notchLayoutGuide = notchLayoutGuide
         self.remoteConfig = remoteConfig
+        self.launcherSettings = launcherSettings
         super.init(
             contentRect: NSRect(origin: .zero, size: Self.windowSize),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -41,6 +43,7 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
         contentView = NSHostingView(
             rootView: DynamicIslandView()
                 .environment(viewModel)
+                .environment(launcherSettings)
                 .environment(clipViewModel)
                 .environment(viewModel.instantSearchSession)
                 .environment(remoteConfig)

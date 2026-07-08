@@ -20,6 +20,13 @@ final class LauncherSettings {
     var clipModifiers: NSEvent.ModifierFlags
     var onClipHotkeyChanged: ((UInt16, NSEvent.ModifierFlags) -> Void)?
 
+    // Browser tabs in launcher search (default off)
+    nonisolated static let showTabsInSearchKey = "launcher_show_tabs_in_search"
+
+    var showTabsInSearch: Bool {
+        didSet { UserDefaults.standard.set(showTabsInSearch, forKey: Self.showTabsInSearchKey) }
+    }
+
     init() {
         let stored     = UserDefaults.standard.integer(forKey: Self.keyCodeKey)
         let storedMods = UserDefaults.standard.integer(forKey: Self.modifiersKey)
@@ -34,6 +41,12 @@ final class LauncherSettings {
         clipModifiers = storedClipMods != 0
             ? NSEvent.ModifierFlags(rawValue: UInt(storedClipMods))
             : [.command, .shift]                                           // default: ⌘⇧
+
+        showTabsInSearch = UserDefaults.standard.bool(forKey: Self.showTabsInSearchKey)
+    }
+
+    nonisolated static var storedShowTabsInSearch: Bool {
+        UserDefaults.standard.bool(forKey: showTabsInSearchKey)
     }
 
     func save(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {

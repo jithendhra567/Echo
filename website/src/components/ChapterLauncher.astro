@@ -1,0 +1,220 @@
+---
+import MediaFrame from './MediaFrame.astro';
+---
+
+<section id="launcher" class="chapter" data-chapter aria-labelledby="launcher-title">
+  <div class="ch-bg" aria-hidden="true"></div>
+
+  <div class="ch-inner">
+    <header class="ch-head reveal">
+      <span class="eyebrow">Chapter 01 — Launcher</span>
+      <h2 id="launcher-title" class="h2">Ask your Mac<br /><em class="grad" style="font-style:normal;">anything.</em></h2>
+    </header>
+
+    <div class="ch-stage" data-stage>
+      <!-- Media 0: launcher screenshot -->
+      <div class="ch-media" data-media-item="0">
+        <MediaFrame
+          src="/media/launcher-search.png"
+          alt="Echo launcher showing app results and browser tabs for a search query"
+          label="Drop launcher-search.png into website/public/media/"
+          class="launcher-frame"
+        />
+      </div>
+
+      <!-- Media 1: CSS-recreated calculation view -->
+      <div class="ch-media" data-media-item="1">
+        <div class="calc-island" role="img" aria-label="Echo launcher showing an inline currency conversion">
+          <div class="calc-search-row">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" stroke="#71717a" stroke-width="1.6"/>
+              <path d="M11 11l3 3" stroke="#71717a" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span class="calc-query">100 usd to eur</span>
+            <span class="cursor" aria-hidden="true"></span>
+          </div>
+
+          <div class="calc-result-card">
+            <div class="calc-result-main">
+              <span class="calc-big grad">92.14</span>
+              <span class="calc-unit">EUR</span>
+            </div>
+            <div class="calc-detail">
+              <span>100 US Dollar → Euro</span>
+              <span class="calc-live"><span class="live-dot"></span>Live rate · Frankfurter</span>
+            </div>
+            <div class="calc-copy-hint"><kbd>↵</kbd> Copy result</div>
+          </div>
+
+          <div class="calc-alt-rows" aria-hidden="true">
+            <div class="calc-alt"><span class="calc-alt-q">15% of 280</span><span class="calc-alt-a">42</span></div>
+            <div class="calc-alt"><span class="calc-alt-q">100 kg to lb</span><span class="calc-alt-a">220.46 lb</span></div>
+            <div class="calc-alt"><span class="calc-alt-q">time in tokyo</span><span class="calc-alt-a">09:41 JST</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-beats" data-beats>
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">⌘ Space</span>
+        <h3 class="ch-beat-title">Find any app in milliseconds</h3>
+        <p class="ch-beat-desc">Results are ranked by how you actually use your Mac — your most-used apps always surface first.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Safari · Chrome · Arc</span>
+        <h3 class="ch-beat-title">Every browser tab, searchable</h3>
+        <p class="ch-beat-desc">Jump to any open tab instantly. Closed tabs stay in history, so any page you've visited is one search away.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Instant search</span>
+        <h3 class="ch-beat-title">The web, without the browser dance</h3>
+        <p class="ch-beat-desc">Type a URL or query and Echo loads it in a built-in panel — prefetched before you even hit enter.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="1">
+        <span class="ch-beat-kbd">Type math, get answers</span>
+        <h3 class="ch-beat-title">A calculator that speaks your language</h3>
+        <p class="ch-beat-desc">Percentages, unit conversions, live currency rates, world time — computed inline as you type.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ch-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(99,102,241,0.08), transparent 65%);
+    pointer-events: none;
+  }
+
+  :global(.launcher-frame) {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ── CSS-recreated calculation island ── */
+  .calc-island {
+    width: min(560px, 100%);
+    margin: 0 auto;
+    background: #101014;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.65),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .calc-search-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .calc-query {
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-1);
+    letter-spacing: -0.01em;
+  }
+
+  .calc-result-card {
+    padding: 26px 22px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .calc-result-main {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .calc-big {
+    font-size: 52px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .calc-unit {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-3);
+  }
+
+  .calc-detail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--text-3);
+  }
+
+  .calc-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #34d399;
+    font-weight: 600;
+    font-size: 11.5px;
+  }
+
+  .live-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52,211,153,0.8);
+  }
+
+  .calc-copy-hint {
+    font-size: 11.5px;
+    color: var(--text-3);
+    padding-top: 4px;
+  }
+
+  .calc-copy-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--accent);
+    font-family: var(--font);
+    margin-right: 6px;
+  }
+
+  .calc-alt-rows {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 12px 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .calc-alt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+  }
+
+  .calc-alt-q { color: var(--text-3); font-family: var(--mono); }
+  .calc-alt-a { color: #34d399; font-weight: 700; }
+</style>

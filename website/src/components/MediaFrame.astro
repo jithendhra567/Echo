@@ -1,0 +1,127 @@
+---
+/**
+ * Renders an image or video with a built-in placeholder frame.
+ * The placeholder shows until the media file loads successfully,
+ * so real assets dropped into public/media/ slot in automatically.
+ */
+interface Props {
+  src: string;
+  alt?: string;
+  video?: boolean;
+  label: string;
+  class?: string;
+}
+
+const { src, alt = '', video = false, label, class: className } = Astro.props;
+---
+
+<figure class:list={['media-frame', className]} data-media-frame>
+  <div class="mf-placeholder" aria-hidden="true">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      {video
+        ? <path d="M13 11l12 7-12 7V11z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        : <>
+            <rect x="5" y="7" width="26" height="22" rx="3" stroke="currentColor" stroke-width="2"/>
+            <circle cx="13" cy="15" r="2.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M5 25l7-6 5 4 6-7 8 9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          </>
+      }
+    </svg>
+    <span class="mf-label">{label}</span>
+    <code class="mf-path">{src}</code>
+  </div>
+
+  {video ? (
+    <video
+      class="mf-media"
+      src={src}
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      aria-label={alt}
+    />
+  ) : (
+    <img class="mf-media" src={src} alt={alt} loading="lazy" decoding="async" />
+  )}
+</figure>
+
+<style>
+  .media-frame {
+    position: relative;
+    margin: 0;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #0d0d11;
+    border: 1px solid rgba(255,255,255,0.09);
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.6),
+      0 0 0 0.5px rgba(255,255,255,0.04),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    min-height: 240px;
+  }
+
+  .mf-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #3f3f46;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 40%, rgba(139,92,246,0.07), transparent 70%),
+      repeating-linear-gradient(45deg, transparent 0 14px, rgba(255,255,255,0.012) 14px 28px);
+    padding: 24px;
+    text-align: center;
+  }
+
+  .mf-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #52525b;
+    letter-spacing: 0.01em;
+  }
+
+  .mf-path {
+    font-size: 10.5px;
+    color: #3f3f46;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 3px 10px;
+    border-radius: 6px;
+  }
+
+  .mf-media {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .media-frame.mf-loaded .mf-media { opacity: 1; }
+  .media-frame.mf-loaded .mf-placeholder { display: none; }
+  .media-frame.mf-loaded { min-height: 0; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-media-frame]').forEach(frame => {
+    const media = frame.querySelector<HTMLImageElement | HTMLVideoElement>('.mf-media');
+    if (!media) return;
+
+    const markLoaded = () => frame.classList.add('mf-loaded');
+
+    if (media instanceof HTMLImageElement) {
+      if (media.complete && media.naturalWidth > 0) markLoaded();
+      else media.addEventListener('load', markLoaded, { once: true });
+    } else {
+      if (media.readyState >= 2) markLoaded();
+      else media.addEventListener('loadeddata', markLoaded, { once: true });
+    }
+  });
+</script>

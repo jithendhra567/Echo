@@ -1,14 +1,13 @@
 ---
-import Layout     from '../layouts/Layout.astro';
-import Nav        from '../components/Nav.astro';
-import Hero       from '../components/Hero.astro';
-import ScrollShowcase from '../components/ScrollShowcase.astro';
-import Features   from '../components/Features.astro';
-import Demo          from '../components/Demo.astro';
-import NotchShowcase from '../components/NotchShowcase.astro';
-import Productivity  from '../components/Productivity.astro';
-import Download   from '../components/Download.astro';
-import Footer     from '../components/Footer.astro';
+import Layout           from '../layouts/Layout.astro';
+import Nav              from '../components/Nav.astro';
+import Hero             from '../components/Hero.astro';
+import ChapterLauncher  from '../components/ChapterLauncher.astro';
+import ChapterClipboard from '../components/ChapterClipboard.astro';
+import ChapterNotch     from '../components/ChapterNotch.astro';
+import Features         from '../components/Features.astro';
+import Download         from '../components/Download.astro';
+import Footer           from '../components/Footer.astro';
 import '../styles/global.css';
 ---
 
@@ -16,289 +15,198 @@ import '../styles/global.css';
   <Nav />
   <main id="main" role="main">
     <Hero />
-    <ScrollShowcase />
+    <ChapterLauncher />
+    <ChapterClipboard />
+    <ChapterNotch />
     <Features />
-    <Demo />
-    <NotchShowcase />
-    <Productivity />
     <Download />
   </main>
   <Footer />
 </Layout>
 
+<!-- ═══════════════════════════════════════════════
+     Motion system — Lenis smooth scroll + GSAP
+     ═══════════════════════════════════════════════ -->
 <script>
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 
 gsap.registerPlugin(ScrollTrigger);
 
-/* ── 1. Hero entrance ── */
-const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+/* ── Lenis smooth scroll, driven by GSAP's ticker ── */
+const lenis = new Lenis({
+  duration: 1.1,
+  easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+});
 
-heroTl
-  .from('#h-badge',    { y: 18, opacity: 0, duration: 0.6, delay: 0.1 })
-  .from('#h-title',    { y: 36, opacity: 0, duration: 0.85 }, '-=0.3')
-  .from('#h-sub',      { y: 24, opacity: 0, duration: 0.7  }, '-=0.55')
-  .from('#h-pillars',  { y: 20, opacity: 0, duration: 0.65 }, '-=0.5')
-  .from('#h-search',   { y: 18, opacity: 0, scale: 0.97, duration: 0.65 }, '-=0.45')
-  .from('#h-ctas .btn-primary',   { y: 16, opacity: 0, duration: 0.5 }, '-=0.4')
-  .from('#h-ctas .btn-secondary', { y: 16, opacity: 0, duration: 0.5 }, '-=0.4')
-  .from('#h-scroll',   { y: 12, opacity: 0, duration: 0.5 }, '-=0.2')
-  .from('#h-window',   { y: 40, opacity: 0, duration: 1.1, ease: 'power4.out' }, 0.5)
-  .from('#h-util',     { y: 24, opacity: 0, duration: 0.8, ease: 'power3.out' }, 0.75)
-  .from('#hero-orb',   { scale: 0.6, opacity: 0, duration: 1.4, ease: 'power2.out' }, 0.2);
+lenis.on('scroll', ScrollTrigger.update);
+gsap.ticker.add((time) => lenis.raf(time * 1000));
+gsap.ticker.lagSmoothing(0);
 
-/* ── 2. Hero 3D orb — mouse parallax ── */
-const orb = document.getElementById('hero-orb');
-if (orb) {
-  document.getElementById('hero')?.addEventListener('mousemove', (e) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width  - 0.5;
-    const y = (e.clientY - rect.top)  / rect.height - 0.5;
-    gsap.to(orb, {
-      rotateY: x * 30,
-      rotateX: -y * 20,
-      duration: 0.8,
-      ease: 'power2.out',
-    });
-  });
-}
-
-/* ── 3. Typing animation ── */
-const QUERIES = [
-  'Open Figma',
-  '100 USD to EUR',
-  '15% of 280',
-  'Time in Tokyo',
-  'github.com',
-  'npm install react',
-];
-
-let qIdx = 0;
-const searchEl    = document.getElementById('search-text');
-const mockQueryEl = document.getElementById('mock-query');
-
-function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)); }
-
-async function typingLoop() {
-  while (true) {
-    const query = QUERIES[qIdx % QUERIES.length];
-    qIdx++;
-    for (let i = 0; i <= query.length; i++) {
-      const slice = query.slice(0, i);
-      if (searchEl)    searchEl.textContent    = slice;
-      if (mockQueryEl) mockQueryEl.textContent = slice || 'Type to search…';
-      await sleep(50 + Math.random() * 40);
+/* Smooth anchor navigation */
+document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const target = document.querySelector(a.getAttribute('href') ?? '');
+    if (target) {
+      e.preventDefault();
+      lenis.scrollTo(target as HTMLElement, { offset: 0 });
     }
-    await sleep(2200);
-    for (let i = query.length; i >= 0; i--) {
-      const slice = query.slice(0, i);
-      if (searchEl)    searchEl.textContent    = slice;
-      if (mockQueryEl) mockQueryEl.textContent = slice || 'Type to search…';
-      await sleep(28);
+  });
+});
+
+/* ── Hero entrance (runs everywhere) ── */
+gsap.timeline({ defaults: { ease: 'power3.out' } })
+  .from('#hero-badge',  { y: 18, opacity: 0, duration: 0.6, delay: 0.1 })
+  .from('#hero-title',  { y: 36, opacity: 0, duration: 0.85 }, '-=0.3')
+  .from('#hero-sub',    { y: 24, opacity: 0, duration: 0.7  }, '-=0.55')
+  .from('#hero-ctas',   { y: 18, opacity: 0, duration: 0.6  }, '-=0.45')
+  .from('#hero-stage',  { y: 60, opacity: 0, duration: 1.1, ease: 'power4.out' }, 0.4)
+  .from('#hero-scroll-hint', { opacity: 0, duration: 0.6 }, '-=0.3');
+
+/* ═══════════════════════════════════════════════
+   Scroll scenes — desktop + motion-ok only.
+   Without them the page is a normal static story.
+   ═══════════════════════════════════════════════ */
+const mm = gsap.matchMedia();
+
+mm.add('(min-width: 768px) and (prefers-reduced-motion: no-preference)', () => {
+
+  /* ── 1. Hero: video frame straightens as you scroll ── */
+  gsap.fromTo('#hero-screen',
+    { rotateX: 24, scale: 0.92, y: 20 },
+    {
+      rotateX: 0, scale: 1, y: 0,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#hero',
+        start: 'top top',
+        end: '+=60%',
+        pin: '#hero-sticky',
+        pinSpacing: true,
+        scrub: 0.6,
+        anticipatePin: 1,
+      },
     }
-    await sleep(500);
-  }
-}
-setTimeout(typingLoop, 1200);
+  );
 
-/* ── 4. 3D Scroll Showcase — pinned card fan ── */
-const cards  = gsap.utils.toArray<HTMLElement>('.ss-card');
-const dots   = gsap.utils.toArray<HTMLElement>('.ss-dot');
-const hint   = document.getElementById('ss-scroll-hint');
-const nCards = cards.length;
-
-if (cards.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-  const positions = [
-    { x: 0,   y: 0,   z: 0,   rotY: 0,   rotX: 0,   scale: 1,    opacity: 1   },
-    { x: -280, y: 20, z: -120, rotY: 35,  rotX: 8,   scale: 0.88, opacity: 0.5 },
-    { x: 280,  y: 20, z: -120, rotY: -35, rotX: 8,   scale: 0.88, opacity: 0.5 },
-  ];
-
-  // Initial state — all cards stacked
-  cards.forEach((card, i) => {
-    gsap.set(card, {
-      x: positions[i]?.x ?? 0,
-      y: positions[i]?.y ?? 0,
-      z: positions[i]?.z ?? -i * 80,
-      rotateY: positions[i]?.rotY ?? 0,
-      rotateX: positions[i]?.rotX ?? 0,
-      scale: i === 0 ? 1 : 0.92,
-      opacity: i === 0 ? 1 : 0.4,
-      transformOrigin: '50% 50%',
-    });
-  });
-
-  ScrollTrigger.create({
-    trigger: '.ss-pin-wrap',
-    start: 'top top',
-    end: 'bottom bottom',
-    scrub: 0.8,
-    onUpdate(self) {
-      const p = self.progress;
-      const activeIdx = Math.min(Math.floor(p * nCards), nCards - 1);
-
-      cards.forEach((card, i) => {
-        const relIdx = (i - activeIdx + nCards) % nCards;
-        const target = positions[relIdx] ?? positions[2];
-
-        // Smooth interpolation between steps
-        const stepProgress = (p * nCards) % 1;
-        const fromIdx = activeIdx;
-        const toIdx   = Math.min(activeIdx + 1, nCards - 1);
-        const fromPos = positions[(i - fromIdx + nCards) % nCards] ?? positions[2];
-        const toPos   = positions[(i - toIdx   + nCards) % nCards] ?? positions[2];
-
-        const t = activeIdx === nCards - 1 ? 1 : stepProgress;
-
-        gsap.set(card, {
-          x:     gsap.utils.interpolate(fromPos.x,     toPos.x,     t),
-          y:     gsap.utils.interpolate(fromPos.y,     toPos.y,     t),
-          z:     gsap.utils.interpolate(fromPos.z,     toPos.z,     t),
-          rotateY: gsap.utils.interpolate(fromPos.rotY, toPos.rotY, t),
-          rotateX: gsap.utils.interpolate(fromPos.rotX, toPos.rotX, t),
-          scale:   gsap.utils.interpolate(fromPos.scale, toPos.scale, t),
-          opacity: gsap.utils.interpolate(fromPos.opacity, toPos.opacity, t),
-        });
-      });
-
-      // Update dots
-      dots.forEach((dot, i) => dot.classList.toggle('active', i === activeIdx));
-
-      // Hide scroll hint after 15% progress
-      if (hint) hint.classList.toggle('hidden', p > 0.12);
-    },
-  });
-
-  // Scene subtle rotation on scroll
-  gsap.to('#ss-scene', {
-    rotateY: 8,
-    ease: 'none',
-    scrollTrigger: {
-      trigger: '.ss-pin-wrap',
-      start: 'top top',
-      end: 'bottom bottom',
-      scrub: 1.5,
-    },
-  });
-}
-
-/* ── 5. ScrollTrigger reveals ── */
-gsap.utils.toArray<HTMLElement>('.reveal').forEach(el => {
-  if (el.id?.startsWith('h-')) return;
-  gsap.from(el, {
-    y: 32,
+  gsap.to('#hero-scroll-hint', {
     opacity: 0,
-    duration: 0.85,
-    ease: 'power3.out',
-    scrollTrigger: { trigger: el, start: 'top 88%', once: true },
+    scrollTrigger: { trigger: '#hero', start: 'top top', end: '+=15%', scrub: true },
   });
-});
 
-/* ── 6. Feature cards 3D stagger ── */
-gsap.from('.feat-card', {
-  y: 50,
-  opacity: 0,
-  rotateX: 12,
-  transformOrigin: '50% 100%',
-  duration: 0.75,
-  stagger: 0.06,
-  ease: 'power3.out',
-  scrollTrigger: { trigger: '#features', start: 'top 75%', once: true },
-});
+  /* ── 2. Chapters: pin, cycle beats, crossfade media ── */
+  const chapters = gsap.utils.toArray<HTMLElement>('[data-chapter]');
 
-/* ── 7. Stats counter ── */
-document.querySelectorAll('.stat-val').forEach(el => {
-  const text = (el as HTMLElement).textContent ?? '';
-  const num = parseFloat(text.replace(/[^\d.]/g, ''));
-  if (!isNaN(num) && num > 1 && !text.includes('∞') && !text.includes('<')) {
-    const obj = { val: 0 };
-    ScrollTrigger.create({
-      trigger: el,
-      start: 'top 85%',
-      once: true,
-      onEnter: () => {
-        gsap.to(obj, {
-          val: num,
-          duration: 1.4,
-          ease: 'power2.out',
-          onUpdate() { (el as HTMLElement).textContent = Math.round(obj.val).toString(); },
-        });
+  chapters.forEach(section => {
+    const beats      = Array.from(section.querySelectorAll<HTMLElement>('[data-beat]'));
+    const mediaItems = Array.from(section.querySelectorAll<HTMLElement>('[data-media-item]'));
+    const stage      = section.querySelector<HTMLElement>('[data-stage]');
+    if (!beats.length) return;
+
+    section.classList.add('fx');
+
+    gsap.set(beats, { autoAlpha: 0, y: 26 });
+    gsap.set(beats[0], { autoAlpha: 1, y: 0 });
+    mediaItems.forEach((m, i) => gsap.set(m, { autoAlpha: i === 0 ? 1 : 0 }));
+
+    /* 3D approach as the chapter scrolls into view */
+    if (stage) {
+      gsap.fromTo(stage,
+        { rotateX: 16, scale: 0.94, transformPerspective: 1200 },
+        {
+          rotateX: 0, scale: 1,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: section,
+            start: 'top bottom',
+            end: 'top top',
+            scrub: 0.6,
+          },
+        }
+      );
+    }
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: section,
+        start: 'top top',
+        end: `+=${beats.length * 70}%`,
+        pin: true,
+        scrub: 0.6,
+        anticipatePin: 1,
       },
     });
-  }
-});
 
-/* ── 8. Parallax glow ── */
-gsap.to('.bg-glow', {
-  y: 80,
-  ease: 'none',
-  scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 1 },
-});
+    let currentMedia = 0;
 
-/* ── 9. Pillar items stagger ── */
-gsap.from('.pillar', {
-  y: 28, opacity: 0, duration: 0.7, stagger: 0.1, ease: 'power3.out',
-  scrollTrigger: { trigger: '.pillars-grid', start: 'top 80%', once: true },
-});
+    /* hold on the first beat */
+    tl.to({}, { duration: 0.6 });
 
-/* ── 10. Command rows stagger ── */
-gsap.from('.cmd-row', {
-  x: -16, opacity: 0, duration: 0.55, stagger: 0.07, ease: 'power2.out',
-  scrollTrigger: { trigger: '.cmd-preview', start: 'top 82%', once: true },
-});
+    beats.forEach((beat, i) => {
+      if (i === 0) return;
+      const prev  = beats[i - 1];
+      const label = `beat${i}`;
 
-/* ── 11. Demo steps ── */
-gsap.from('.demo-step', {
-  y: 24, opacity: 0, duration: 0.6, stagger: 0.12, ease: 'power3.out',
-  scrollTrigger: { trigger: '.demo-steps', start: 'top 80%', once: true },
-});
+      tl.addLabel(label)
+        .to(prev, { autoAlpha: 0, y: -26, duration: 0.3 }, label)
+        .fromTo(beat, { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.3 }, `${label}+=0.12`);
 
-/* ── 12. Magnetic buttons ── */
-document.querySelectorAll<HTMLElement>('.btn-magnetic').forEach(btn => {
-  btn.addEventListener('mousemove', (e) => {
-    const rect = btn.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width  / 2;
-    const y = e.clientY - rect.top  - rect.height / 2;
-    gsap.to(btn, { x: x * 0.18, y: y * 0.18, duration: 0.4, ease: 'power2.out' });
+      const m = parseInt(beat.dataset.media ?? '', 10);
+      if (!isNaN(m) && m !== currentMedia && mediaItems[m]) {
+        tl.to(mediaItems[currentMedia], { autoAlpha: 0, scale: 0.96, duration: 0.3 }, label)
+          .fromTo(mediaItems[m], { autoAlpha: 0, scale: 1.05 }, { autoAlpha: 1, scale: 1, duration: 0.3 }, `${label}+=0.12`);
+        currentMedia = m;
+      }
+
+      tl.to({}, { duration: 0.6 });
+    });
   });
-  btn.addEventListener('mouseleave', () => {
-    gsap.to(btn, { x: 0, y: 0, duration: 0.65, ease: 'elastic.out(1, 0.4)' });
+
+  /* ── 3. Clipboard parallax floats ── */
+  gsap.utils.toArray<HTMLElement>('[data-parallax]').forEach(el => {
+    const amount = parseFloat(el.dataset.parallax ?? '20');
+    gsap.fromTo(el,
+      { y: -amount },
+      {
+        y: amount,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '#clipboard',
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: 1,
+        },
+      }
+    );
   });
-});
 
-/* ── 13. Notch showcase ── */
-gsap.from('.ns-display', {
-  scale: 0.94, opacity: 0, duration: 1.1, ease: 'power3.out',
-  scrollTrigger: { trigger: '#notch-showcase', start: 'top 78%', once: true },
-});
-gsap.from('.ns-callout', {
-  y: 24, opacity: 0, duration: 0.65, stagger: 0.12, ease: 'power3.out',
-  scrollTrigger: { trigger: '.ns-callouts', start: 'top 85%', once: true },
-});
+  /* ── 4. Reveals ── */
+  gsap.utils.toArray<HTMLElement>('.reveal').forEach(el => {
+    gsap.from(el, {
+      y: 32,
+      opacity: 0,
+      duration: 0.85,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 88%', once: true },
+    });
+  });
 
-/* ── 14. Download section ── */
-gsap.from('.dl-icon', {
-  scale: 0.7, opacity: 0, duration: 0.9, ease: 'back.out(1.7)',
-  scrollTrigger: { trigger: '#download', start: 'top 80%', once: true },
-});
-gsap.from('.dl-btn', {
-  y: 24, opacity: 0, duration: 0.7, stagger: 0.12, ease: 'power3.out',
-  scrollTrigger: { trigger: '.dl-buttons', start: 'top 85%', once: true },
-});
+  /* ── 5. Feature cards stagger per group ── */
+  gsap.utils.toArray<HTMLElement>('.feat-group').forEach(group => {
+    gsap.from(group.querySelectorAll('.feat-card'), {
+      y: 36,
+      opacity: 0,
+      duration: 0.65,
+      stagger: 0.07,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: group, start: 'top 82%', once: true },
+    });
+  });
 
-/* ── 15. Hero floating elements — scroll parallax 3D ── */
-gsap.to('#h-window', {
-  y: -60,
-  rotateY: 15,
-  rotateX: -5,
-  ease: 'none',
-  scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 1.2 },
-});
-gsap.to('#h-util', {
-  y: -40,
-  rotateY: -12,
-  ease: 'none',
-  scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 1.2 },
+  /* cleanup when leaving this media context */
+  return () => {
+    chapters.forEach(s => s.classList.remove('fx'));
+  };
 });
 </script>

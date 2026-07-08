@@ -75,6 +75,10 @@ enum AnalyticsService {
         log("launcher_panel_switched", ["panel": panel])
     }
 
+    static func logLauncherTabsInSearchChanged(enabled: Bool) {
+        log("launcher_tabs_in_search_changed", ["enabled": enabled])
+    }
+
     static func logSearchQuery(length: Int) {
         log("search_query", ["query_length_bucket": queryLengthBucket(length)])
     }
@@ -207,6 +211,28 @@ enum AnalyticsService {
 
     static func logHotkeyChanged(target: String) {
         log("hotkey_changed", ["target": target])
+    }
+
+    // MARK: - Onboarding
+
+    static func logOnboardingShown(source: String = "first_launch") {
+        log("onboarding_shown", ["source": source])
+    }
+
+    static func logOnboardingReplayed() {
+        log("onboarding_replayed")
+    }
+
+    static func logOnboardingSkipped() {
+        log("onboarding_skipped")
+    }
+
+    static func logOnboardingCompleted(step: Int) {
+        log("onboarding_completed", ["last_step": step])
+    }
+
+    static func logOnboardingTryLauncher() {
+        log("onboarding_try_launcher")
     }
 
     // MARK: - Notch

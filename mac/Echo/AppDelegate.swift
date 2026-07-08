@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var activationObserver: NSObjectProtocol?
     private let sparkleUpdater = SparkleUpdaterController()
     private let forceUpdateController = ForceUpdateController()
+    private var onboardingController: OnboardingController?
     private let appLaunchTime = Date()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -46,10 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherPanel    = DynamicIslandWindow(
             clipViewModel: viewModel,
             notchLayoutGuide: notchLayoutGuide,
-            remoteConfig: remoteConfig
+            remoteConfig: remoteConfig,
+            launcherSettings: launcherSettings
         )
         launcherPanel.prewarm()
-        launcherPanel.viewModel.warmTabsCache()
+        if launcherSettings.showTabsInSearch {
+            launcherPanel.viewModel.warmTabsCache()
+        }
         launcherPanel.viewModel.onOpenDashboard = { [weak self] in self?.openDashboard() }
         launcherPanel.onDidBecomeKey = { [weak self] in
             // Spotlight-style search must not pull an open Dashboard window forward.
@@ -100,11 +104,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchPanel.start()
 
         viewModel.loadPanelFirstPage()
-        monitor.start()
         setupStatusBar()
         setupGlobalHotkey()
         setupAppActivationTracking()
         setupLaunchAtLoginStatusRefresh()
+
+        onboardingController = OnboardingController(
+            settings: launcherSettings,
+            launchAtLogin: launchAtLogin,
+            onTryLauncher: { [weak self] in self?.launcherPanel.show() }
+        )
+        onboardingController?.presentIfNeeded(store: store) { [weak self] in
+            self?.monitor.start()
+        }
 
         Task { await evaluateUpdates() }
     }
@@ -178,6 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(notchLayoutGuide)
             .environment(appSettings)
             .environment(statsProvider)
+            .environment(\.showOnboardingAgain, { [weak self] in self?.showOnboardingAgain() })
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 540),
@@ -200,6 +213,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window.orderFrontRegardless()
         window.makeKey()
+    }
+
+    func showOnboardingAgain() {
+        onboardingController?.presentAgain()
     }
 
     // MARK: - Global hotkeys (⌘⇧V clipboard panel + launcher hotkey + Escape)

@@ -62,6 +62,24 @@ final class LauncherViewModel {
 
     private static let clipboardDisplayLimit = 250
 
+    /// When browser tabs share the column, keep the default app list short.
+    private static let defaultAppLimitWithTabs = 4
+    private static let defaultAppLimitWithoutTabs = 14
+    private static let searchAppLimitWithTabs = 5
+    private static let searchAppLimitWithoutTabs = 12
+
+    private var appResultsLimit: Int {
+        tabsInSearchEnabled ? Self.defaultAppLimitWithTabs : Self.defaultAppLimitWithoutTabs
+    }
+
+    private var appSearchResultsLimit: Int {
+        tabsInSearchEnabled ? Self.searchAppLimitWithTabs : Self.searchAppLimitWithoutTabs
+    }
+
+    private func maxAppResults(for query: String) -> Int {
+        query.trimmingCharacters(in: .whitespaces).isEmpty ? appResultsLimit : appSearchResultsLimit
+    }
+
     // MARK: - Derived
 
     var filteredClips: [Clip] {
@@ -115,16 +133,24 @@ final class LauncherViewModel {
     var isSearching: Bool { !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty }
 
     /// Currently open browser tabs from the latest search results.
-    var liveTabResults: [BrowserTab] { tabResults.filter { !$0.isSaved } }
+    var liveTabResults: [BrowserTab] {
+        guard tabsInSearchEnabled else { return [] }
+        return tabResults.filter { !$0.isSaved }
+    }
 
     /// Saved/history tabs from the latest search results (excludes URLs that are open).
-    var savedTabResults: [BrowserTab] { tabResults.filter { $0.isSaved } }
+    var savedTabResults: [BrowserTab] { 
+        guard tabsInSearchEnabled else { return [] }
+        return tabResults.filter { $0.isSaved }
+    }
 
     /// Default launcher view: active tabs first, then saved history.
     var defaultTabResults: [BrowserTab] {
-        guard !isSearching else { return [] }
+        guard tabsInSearchEnabled, !isSearching else { return [] }
         return tabResults
     }
+
+    private var tabsInSearchEnabled: Bool { LauncherSettings.storedShowTabsInSearch }
 
     /// While searching: interleave apps with live tabs, then append saved matches.
     var mixedSearchResults: [LauncherSearchItem] {
@@ -163,10 +189,12 @@ final class LauncherViewModel {
             AnalyticsService.logSearchQuery(length: trimmed.count)
         }
         Task {
-            results = await engine.search(query: searchQuery)
+            results = await engine.search(query: searchQuery, maxResults: maxAppResults(for: searchQuery))
             instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
         }
-        tabResults = tabEngine.search(query: searchQuery, in: cachedAllTabs)
+        tabResults = tabsInSearchEnabled
+            ? tabEngine.search(query: searchQuery, in: cachedAllTabs)
+            : []
         if let url = instantSearchTargetURL {
             if isInstantSearchOpen {
                 instantSearchSession.load(url)
@@ -235,16 +263,17 @@ final class LauncherViewModel {
     }
 
     func refreshDefaults() async {
-        results = await engine.search(query: "")
+        results = await engine.search(query: "", maxResults: appResultsLimit)
     }
 
     /// Rebuilds the installed-app index (e.g. after a new install) and refreshes visible results.
     func reindexApps() async {
         await engine.indexApps()
-        results = await engine.search(query: searchQuery)
+        results = await engine.search(query: searchQuery, maxResults: maxAppResults(for: searchQuery))
     }
 
     func refreshTabs() async {
+        guard tabsInSearchEnabled else { return }
         // Fetch live tabs, persist them, then merge with saved history.
         let activeTabs = await tabEngine.fetchTabs()
         for tab in activeTabs { await tabStore.save(tab) }
@@ -271,7 +300,17 @@ final class LauncherViewModel {
 
     /// Background warm-up so the first launcher open may already have tab data.
     func warmTabsCache() {
+        guard tabsInSearchEnabled else { return }
         Task { await refreshTabs() }
+    }
+
+    func clearTabResults() {
+        tabPollerTask?.cancel()
+        tabPollerTask = nil
+        tabResults = []
+        cachedAllTabs = []
+        cachedActiveTabs = []
+        tabsAreLoading = false
     }
 
     // MARK: - Panel switching
@@ -546,6 +585,7 @@ final class LauncherViewModel {
     }
 
     func expand() {
+        guard tabsInSearchEnabled else { return }
         tabPollerTask?.cancel()
         tabPollerTask = Task { [weak self] in
             guard let self else { return }

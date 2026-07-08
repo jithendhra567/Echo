@@ -1,242 +1,108 @@
 ---
-const pillars = [
-  { label: 'Launcher', desc: 'Apps & tabs', color: '#818cf8' },
-  { label: 'Clipboard', desc: 'Full history', color: '#a78bfa' },
-  { label: 'Notch', desc: 'Music & tray', color: '#ec4899' },
-];
+import MediaFrame from './MediaFrame.astro';
 ---
 
 <section id="hero" aria-label="Hero">
-  <div class="bg-glow" aria-hidden="true"></div>
-  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="hero-sticky" id="hero-sticky">
+    <div class="hero-bg-glow" aria-hidden="true"></div>
+    <div class="hero-bg-grid" aria-hidden="true"></div>
 
-  <!-- 3D floating orb -->
-  <div class="hero-3d-scene" aria-hidden="true">
-    <div class="hero-3d-orb" id="hero-orb">
-      <div class="orb-ring orb-ring-1"></div>
-      <div class="orb-ring orb-ring-2"></div>
-      <div class="orb-ring orb-ring-3"></div>
-      <div class="orb-core">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <path d="M10 24 A18 18 0 0 1 38 24" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
-          <path d="M15 24 A13 13 0 0 1 33 24" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
-          <path d="M20 24 A8  8  0 0 1 28 24" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
+    <div class="hero-copy" id="hero-copy">
+      <div class="hero-badge" id="hero-badge">
+        <span class="badge-dot" aria-hidden="true"></span>
+        Free for macOS · 100% local
+      </div>
+
+      <h1 class="hero-h1" id="hero-title">
+        Clipboard. Launcher. Notch.<br />
+        <em class="grad" style="font-style:normal;">One keystroke.</em>
+      </h1>
+
+      <p class="hero-sub" id="hero-sub">
+        Echo lives in your menu bar. Search any app or tab, recall
+        everything you've copied, and put your notch to work.
+      </p>
+
+      <div class="hero-ctas" id="hero-ctas">
+        <a href="#download" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          Download for Mac
+        </a>
+        <a href="#launcher" class="btn-secondary">Watch it work</a>
       </div>
     </div>
-  </div>
 
-  <div class="hero-center">
-    <div class="hero-badge reveal" id="h-badge">
-      <span class="badge-dot" aria-hidden="true"></span>
-      <span>Free for macOS · No account needed</span>
+    <!-- Video in 3D frame — straightens on scroll -->
+    <div class="hero-stage persp" id="hero-stage">
+      <div class="hero-screen preserve-3d" id="hero-screen">
+        <MediaFrame
+          video
+          src="/media/hero-demo.mp4"
+          alt="Echo demo: launching apps, searching the clipboard, and using the notch"
+          label="Drop hero-demo.mp4 into website/public/media/"
+          class="hero-frame"
+        />
+        <div class="hero-screen-glow" aria-hidden="true"></div>
+      </div>
     </div>
 
-    <h1 class="hero-h1 reveal" id="h-title">
-      Clipboard.<br />
-      Launcher.<br />
-      <em class="grad" style="font-style:normal;">Notch.</em>
-    </h1>
-
-    <p class="hero-sub reveal" id="h-sub">
-      Echo lives in your menu bar and gives you three superpowers —
-      search any app or tab, recall every copy, and control your notch —
-      all from a single keystroke.
-    </p>
-
-    <!-- Three pillar pills — instant comprehension -->
-    <div class="hero-pillars reveal" id="h-pillars" role="list">
-      {pillars.map(p => (
-        <div class="hero-pillar" role="listitem" style={`--p-color:${p.color};`}>
-          <span class="pillar-dot" aria-hidden="true"></span>
-          <span class="pillar-label">{p.label}</span>
-          <span class="pillar-desc">{p.desc}</span>
-        </div>
-      ))}
-    </div>
-
-    <div class="hero-search reveal" id="h-search" aria-label="Example search queries">
-      <kbd class="cmd-key" aria-hidden="true">⌘</kbd>
-      <span class="search-divider" aria-hidden="true"></span>
-      <span id="search-text" aria-live="polite"></span>
-      <span class="cursor" aria-hidden="true"></span>
-    </div>
-
-    <div class="hero-ctas reveal" id="h-ctas">
-      <a href="#download" class="btn-primary btn-magnetic" aria-label="Download Echo for Mac">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-        Download for Mac
-      </a>
-      <a href="#scroll-showcase" class="btn-secondary btn-magnetic" aria-label="See how Echo works">
-        See how it works
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </a>
-    </div>
-
-    <div class="scroll-hint reveal" id="h-scroll" aria-hidden="true">
+    <div class="hero-scroll-hint" id="hero-scroll-hint" aria-hidden="true">
       <div class="scroll-line"></div>
-      <span>Scroll to explore</span>
+      <span>Scroll</span>
     </div>
-  </div>
-
-  <!-- Floating launcher mockup -->
-  <div class="float-window-wrap reveal float-a" id="h-window" aria-label="Echo launcher preview" role="img">
-    <div class="mac-window launcher-mock">
-      <div class="mac-titlebar">
-        <span class="mac-dot" style="background:#ff5f57;"></span>
-        <span class="mac-dot" style="background:#febc2e;"></span>
-        <span class="mac-dot" style="background:#28c840;"></span>
-      </div>
-      <div class="mock-search-row">
-        <span class="mock-cmd-key" aria-hidden="true">⌘</span>
-        <span id="mock-query">Open Figma</span>
-        <span class="cursor" style="height:14px;" aria-hidden="true"></span>
-      </div>
-      <div class="mock-section-label">APPLICATIONS</div>
-      <div class="mock-result selected" aria-selected="true">
-        <div class="mock-icon" style="background:rgba(99,102,241,0.25);">🎨</div>
-        <span class="mock-name">Figma</span>
-        <span class="mock-ret" aria-hidden="true">↵</span>
-      </div>
-      <div class="mock-result">
-        <div class="mock-icon" style="background:rgba(59,130,246,0.2);">💻</div>
-        <span class="mock-name">VS Code</span>
-      </div>
-      <div class="mock-result">
-        <div class="mock-icon" style="background:rgba(20,184,166,0.2);">🌐</div>
-        <span class="mock-name">Arc</span>
-      </div>
-      <div class="mock-section-label" style="margin-top:4px;">BROWSER TABS</div>
-      <div class="mock-result">
-        <div class="mock-icon" style="background:rgba(249,115,22,0.2);">🔖</div>
-        <span class="mock-name" style="color:#71717a;font-size:11px;">Design System – Figma</span>
-      </div>
-    </div>
-
-    <div class="tray-float notch-pill float-b" aria-label="Notch tray preview">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-        <path d="M7 2v6M4 5l3 3 3-3" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M2 11h10" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
-      <span class="tray-label">3 files in tray</span>
-    </div>
-  </div>
-
-  <div class="util-card glass float-b reveal" id="h-util" aria-label="Calculation preview">
-    <div class="util-query" aria-label="Query">100 USD to EUR</div>
-    <div class="util-result grad" aria-label="Result">92.14 <span style="-webkit-text-fill-color:#52525b;background:none;font-size:13px;">EUR</span></div>
-    <div class="util-detail">Live rate · Frankfurter</div>
   </div>
 </section>
 
 <style>
   #hero {
     position: relative;
+  }
+
+  .hero-sticky {
+    position: relative;
     min-height: 100svh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 110px 24px 48px;
     overflow: hidden;
-    padding: 100px 24px 60px;
+    gap: 48px;
   }
 
-  .bg-glow {
+  .hero-bg-glow {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 90% 55% at 50% -5%, rgba(139,92,246,0.2) 0%, transparent 70%),
-      radial-gradient(ellipse 50% 30% at 80% 80%, rgba(99,102,241,0.08) 0%, transparent 60%);
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(139,92,246,0.22) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 15% 70%, rgba(236,72,153,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 85% 70%, rgba(56,189,248,0.05) 0%, transparent 60%);
     pointer-events: none;
   }
 
-  .bg-grid {
+  .hero-bg-grid {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
     background-size: 72px 72px;
     pointer-events: none;
-    mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 80%);
-    -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 80%);
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 25%, transparent 75%);
   }
 
-  /* 3D orb */
-  .hero-3d-scene {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 500px;
-    height: 500px;
-    perspective: 800px;
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.5;
-  }
-
-  .hero-3d-orb {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    animation: orb-idle 12s ease-in-out infinite;
-  }
-
-  @keyframes orb-idle {
-    0%, 100% { transform: rotateX(15deg) rotateY(0deg); }
-    33%       { transform: rotateX(20deg) rotateY(120deg); }
-    66%       { transform: rotateX(10deg) rotateY(240deg); }
-  }
-
-  .orb-ring {
-    position: absolute;
-    inset: 0;
-    border: 1px solid rgba(167,139,250,0.15);
-    border-radius: 50%;
-    transform-style: preserve-3d;
-  }
-
-  .orb-ring-1 { transform: rotateX(70deg); animation: ring-spin 8s linear infinite; }
-  .orb-ring-2 { transform: rotateX(70deg) rotateY(60deg); animation: ring-spin 12s linear infinite reverse; opacity: 0.6; }
-  .orb-ring-3 { transform: rotateX(70deg) rotateY(120deg); animation: ring-spin 10s linear infinite; opacity: 0.3; }
-
-  @keyframes ring-spin {
-    from { transform: rotateX(70deg) rotateZ(0deg); }
-    to   { transform: rotateX(70deg) rotateZ(360deg); }
-  }
-
-  .orb-core {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80px;
-    height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(167,139,250,0.08);
-    border: 1px solid rgba(167,139,250,0.2);
-    border-radius: 50%;
-    box-shadow: 0 0 60px rgba(139,92,246,0.25);
-  }
-
-  .hero-center {
+  .hero-copy {
     position: relative;
     z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    max-width: 720px;
-    margin: 0 auto;
+    max-width: 760px;
   }
 
   .hero-badge {
@@ -250,123 +116,32 @@ const pillars = [
     font-size: 12.5px;
     font-weight: 500;
     color: #c4b5fd;
-    margin-bottom: 24px;
+    margin-bottom: 26px;
   }
 
   .badge-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #a78bfa;
+    background: var(--accent);
     box-shadow: 0 0 8px rgba(167,139,250,0.8);
   }
 
   .hero-h1 {
-    font-size: clamp(48px, 9vw, 88px);
+    font-size: clamp(40px, 6.5vw, 78px);
     font-weight: 800;
-    line-height: 1.02;
-    letter-spacing: -0.04em;
-    color: #fafafa;
-    margin: 0 0 20px;
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+    color: var(--text-1);
+    margin: 0 0 22px;
   }
 
   .hero-sub {
-    font-size: clamp(16px, 2vw, 18px);
-    font-weight: 400;
+    font-size: clamp(16px, 2vw, 19px);
     line-height: 1.65;
-    color: #71717a;
-    margin: 0 0 28px;
-    max-width: 520px;
-  }
-
-  /* Pillar pills */
-  .hero-pillars {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 28px;
-  }
-
-  .hero-pillar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 100px;
-    transition: border-color 0.2s, background 0.2s;
-  }
-
-  .hero-pillar:hover {
-    border-color: color-mix(in srgb, var(--p-color) 40%, transparent);
-    background: color-mix(in srgb, var(--p-color) 8%, transparent);
-  }
-
-  .pillar-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--p-color);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--p-color) 60%, transparent);
-  }
-
-  .pillar-label {
-    font-size: 13px;
-    font-weight: 700;
-    color: #fafafa;
-    letter-spacing: -0.01em;
-  }
-
-  .pillar-desc {
-    font-size: 11px;
-    color: #52525b;
-    font-weight: 500;
-  }
-
-  .hero-search {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 14px;
-    width: 100%;
-    max-width: 440px;
-    margin-bottom: 28px;
-    box-shadow: 0 0 0 4px rgba(139,92,246,0.06), 0 8px 32px rgba(0,0,0,0.3);
-  }
-
-  .cmd-key {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    font-size: 14px;
-    color: #71717a;
-    flex-shrink: 0;
-  }
-
-  .search-divider {
-    width: 1px;
-    height: 18px;
-    background: rgba(255,255,255,0.08);
-    flex-shrink: 0;
-  }
-
-  #search-text {
-    flex: 1;
-    font-size: 15px;
-    font-weight: 500;
-    color: #fafafa;
-    text-align: left;
-    min-height: 22px;
+    color: var(--text-2);
+    margin: 0 0 32px;
+    max-width: 540px;
   }
 
   .hero-ctas {
@@ -375,185 +150,68 @@ const pillars = [
     gap: 14px;
     flex-wrap: wrap;
     justify-content: center;
-    margin-bottom: 40px;
   }
 
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 28px;
-    background: #a78bfa;
-    color: #09090b;
-    font-size: 15px;
-    font-weight: 700;
-    border-radius: 100px;
-    text-decoration: none;
-    transition: background 0.2s, box-shadow 0.2s;
-    box-shadow: 0 0 32px rgba(139,92,246,0.35);
-    white-space: nowrap;
+  /* 3D video stage */
+  .hero-stage {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 880px;
   }
 
-  .btn-primary:hover {
-    background: #c4b5fd;
-    box-shadow: 0 0 48px rgba(139,92,246,0.5);
+  .hero-screen {
+    position: relative;
+    transform-origin: 50% 100%;
   }
 
-  .btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 24px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.10);
-    color: #a1a1aa;
-    font-size: 15px;
-    font-weight: 600;
-    border-radius: 100px;
-    text-decoration: none;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
-    white-space: nowrap;
+  :global(.hero-frame) {
+    border-radius: 20px;
+    aspect-ratio: 16 / 10;
   }
 
-  .btn-secondary:hover {
-    background: rgba(255,255,255,0.09);
-    color: #fafafa;
-    border-color: rgba(255,255,255,0.16);
+  :global(.hero-frame .mf-media) {
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
   }
 
-  .scroll-hint {
+  .hero-screen-glow {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: -32px;
+    height: 70px;
+    background: radial-gradient(ellipse at center, rgba(139,92,246,0.28), transparent 70%);
+    filter: blur(28px);
+    pointer-events: none;
+  }
+
+  .hero-scroll-hint {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    color: #3f3f46;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
+    color: var(--text-3);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
+    z-index: 3;
   }
 
   .scroll-line {
     width: 1px;
-    height: 36px;
-    background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
-  }
-
-  .float-window-wrap {
-    position: absolute;
-    right: max(24px, calc(50% - 640px + 24px));
-    top: 50%;
-    transform: translateY(-50%) rotate(-1.5deg);
-    z-index: 3;
-    width: 300px;
-  }
-
-  .launcher-mock { width: 100%; }
-
-  .mock-search-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    background: rgba(255,255,255,0.02);
-  }
-
-  .mock-cmd-key {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 5px;
-    font-size: 12px;
-    color: #71717a;
-    flex-shrink: 0;
-  }
-
-  #mock-query {
-    font-size: 13px;
-    font-weight: 500;
-    color: #fafafa;
-    flex: 1;
-  }
-
-  .mock-section-label {
-    font-size: 9.5px;
-    font-weight: 700;
-    color: #3f3f46;
-    letter-spacing: 0.1em;
-    padding: 10px 14px 4px;
-  }
-
-  .mock-result {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 14px;
-  }
-
-  .mock-result.selected {
-    background: rgba(139,92,246,0.15);
-    border-left: 2px solid #a78bfa;
-  }
-
-  .mock-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    flex-shrink: 0;
-  }
-
-  .mock-name { font-size: 13px; font-weight: 500; color: #fafafa; flex: 1; }
-  .mock-ret  { font-size: 12px; color: #a78bfa; font-weight: 600; }
-
-  .tray-float {
-    position: absolute;
-    bottom: -36px;
-    left: -50px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    z-index: 5;
-  }
-
-  .tray-label { font-size: 12px; font-weight: 600; color: #a1a1aa; }
-
-  .util-card {
-    position: absolute;
-    left: max(24px, calc(50% - 640px + 24px));
-    bottom: 20%;
-    padding: 16px 20px;
-    z-index: 3;
-    width: 210px;
-  }
-
-  .util-query { font-size: 11px; color: #52525b; font-weight: 500; margin-bottom: 4px; }
-  .util-result { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-bottom: 4px; }
-  .util-detail { font-size: 10px; color: #3f3f46; font-weight: 500; }
-
-  @media (max-width: 1024px) {
-    .float-window-wrap, .util-card { display: none; }
-    .hero-3d-scene { opacity: 0.25; width: 350px; height: 350px; }
+    height: 32px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.18), transparent);
   }
 
   @media (max-width: 640px) {
-    #hero { padding: 120px 20px 40px; }
+    .hero-sticky { padding: 100px 20px 60px; gap: 36px; }
     .hero-ctas { flex-direction: column; width: 100%; }
-    .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
-    .hero-search { max-width: 100%; }
-    .pillar-desc { display: none; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hero-3d-orb, .orb-ring { animation: none; }
+    .hero-ctas a { width: 100%; justify-content: center; }
   }
 </style>

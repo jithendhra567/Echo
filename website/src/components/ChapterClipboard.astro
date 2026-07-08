@@ -1,0 +1,151 @@
+---
+import MediaFrame from './MediaFrame.astro';
+---
+
+<section id="clipboard" class="chapter" data-chapter aria-labelledby="clipboard-title">
+  <div class="ch-bg" aria-hidden="true"></div>
+
+  <div class="ch-inner">
+    <header class="ch-head reveal">
+      <span class="eyebrow">Chapter 02 — Clipboard</span>
+      <h2 id="clipboard-title" class="h2">Copy once.<br /><em class="grad" style="font-style:normal;">Keep forever.</em></h2>
+    </header>
+
+    <div class="ch-stage clip-stage" data-stage>
+      <div class="ch-media" data-media-item="0">
+        <div class="clip-scene">
+          <MediaFrame
+            src="/media/clipboard-panel.png"
+            alt="Echo clipboard history panel showing recent text, link, and image clips"
+            label="Drop clipboard-panel.png into website/public/media/"
+            class="clip-frame"
+          />
+
+          <!-- Parallax layers (float in front of the screenshot) -->
+          <div class="clip-float clip-float-a glass" data-parallax="-30" aria-hidden="true">
+            <div class="cf-icon" style="background:rgba(167,139,250,0.2);color:#a78bfa;">T</div>
+            <div class="cf-body">
+              <div class="cf-text">npm install lenis gsap</div>
+              <div class="cf-meta">Terminal · just now</div>
+            </div>
+          </div>
+
+          <div class="clip-float clip-float-b glass" data-parallax="24" aria-hidden="true">
+            <div class="cf-icon" style="background:rgba(56,189,248,0.18);color:#38bdf8;">🔗</div>
+            <div class="cf-body">
+              <div class="cf-text">github.com/owner/repo</div>
+              <div class="cf-meta">Chrome · 2 min ago</div>
+            </div>
+          </div>
+
+          <div class="clip-float clip-float-c glass" data-parallax="-16" aria-hidden="true">
+            <div class="cf-icon" style="background:rgba(251,191,36,0.18);color:#fbbf24;">🖼</div>
+            <div class="cf-body">
+              <div class="cf-text">screenshot.png</div>
+              <div class="cf-meta">Pinned</div>
+            </div>
+            <svg class="cf-pin" width="12" height="12" viewBox="0 0 12 12" fill="#a78bfa" aria-hidden="true">
+              <path d="M6 1l1.5 3 3.3.5-2.4 2.3.6 3.2L6 8.5 3 10l.6-3.2L1.2 4.5 4.5 4 6 1z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-beats" data-beats>
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">⌘⇧V</span>
+        <h3 class="ch-beat-title">Everything you copy, remembered</h3>
+        <p class="ch-beat-desc">Text, images, links, rich content — captured automatically the moment you copy, searchable forever.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Context included</span>
+        <h3 class="ch-beat-title">Know where every clip came from</h3>
+        <p class="ch-beat-desc">Each entry keeps its source app and window title, so "that thing I copied yesterday" is easy to find.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Pin it</span>
+        <h3 class="ch-beat-title">Pin what matters</h3>
+        <p class="ch-beat-desc">History keeps 7 to 365 days of clips — your choice. Pinned clips never expire.</p>
+      </div>
+
+      <div class="ch-beat" data-beat data-media="0">
+        <span class="ch-beat-kbd">Drag &amp; drop</span>
+        <h3 class="ch-beat-title">Drag it straight into any app</h3>
+        <p class="ch-beat-desc">The panel never steals focus from your work — grab a clip and drop it right where you're typing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ch-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(139,92,246,0.09), transparent 65%);
+    pointer-events: none;
+  }
+
+  .clip-scene {
+    position: relative;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  :global(.clip-frame) {
+    width: 100%;
+  }
+
+  .clip-float {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    z-index: 3;
+    box-shadow: 0 20px 48px rgba(0,0,0,0.5);
+    will-change: transform;
+  }
+
+  .clip-float-a { top: -22px; left: -36px; }
+  .clip-float-b { bottom: 18%; right: -44px; }
+  .clip-float-c { bottom: -26px; left: 10%; }
+
+  .cf-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .cf-text {
+    font-size: 12px;
+    color: var(--text-1);
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+
+  .cf-meta {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+
+  .cf-pin { flex-shrink: 0; margin-left: 4px; }
+
+  @media (max-width: 900px) {
+    .clip-float-a { left: 4px; }
+    .clip-float-b { right: 4px; }
+  }
+
+  @media (max-width: 640px) {
+    .clip-float { display: none; }
+  }
+</style>
