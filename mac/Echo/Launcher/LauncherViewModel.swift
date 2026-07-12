@@ -41,6 +41,7 @@ final class LauncherViewModel {
     let instantSearchSession = InstantSearchSession()
 
     private var utilityResolveTask: Task<Void, Never>?
+    private var searchAnalyticsTask: Task<Void, Never>?
 
     var onDismiss: (() -> Void)?
     var onLaunch:  (() -> Void)?
@@ -84,7 +85,7 @@ final class LauncherViewModel {
 
     var filteredClips: [Clip] {
         guard let clipVM else { return [] }
-        let query = searchQuery.lowercased()
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let matched: [Clip]
         if query.isEmpty {
             matched = clipVM.clips
@@ -95,9 +96,14 @@ final class LauncherViewModel {
     }
 
     private func clipMatches(_ clip: Clip, query: String) -> Bool {
-        if clip.plainText?.lowercased().contains(query) == true { return true }
-        if clip.attributedString?.string.lowercased().contains(query) == true { return true }
-        if clip.sourceAppName?.lowercased().contains(query) == true { return true }
+        if let text = clip.searchableText,
+           text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            return true
+        }
+        if let name = clip.sourceAppName,
+           name.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            return true
+        }
         return false
     }
 
@@ -184,10 +190,7 @@ final class LauncherViewModel {
         selectedIndex     = 0
         clipSelectedIndex = 0
         resolveUtility()
-        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
-        if !trimmed.isEmpty {
-            AnalyticsService.logSearchQuery(length: trimmed.count)
-        }
+        scheduleSearchAnalytics()
         Task {
             results = await engine.search(query: searchQuery, maxResults: maxAppResults(for: searchQuery))
             instantSearchFirst = !(await InstantSearchUsageStore.shared.prefersGoogleOverInstant)
@@ -201,6 +204,23 @@ final class LauncherViewModel {
             } else if showsInstantSearchRow {
                 instantSearchSession.prefetch(url: url)
             }
+        }
+    }
+
+    /// Firebase Analytics on every keystroke is wasteful; coalesce to a short pause.
+    private func scheduleSearchAnalytics() {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            searchAnalyticsTask?.cancel()
+            return
+        }
+        searchAnalyticsTask?.cancel()
+        searchAnalyticsTask = Task {
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            let length = searchQuery.trimmingCharacters(in: .whitespaces).count
+            guard length > 0 else { return }
+            AnalyticsService.logSearchQuery(length: length)
         }
     }
 
@@ -614,6 +634,8 @@ final class LauncherViewModel {
         launchingAppID        = nil
         utilityResolveTask?.cancel()
         utilityResolveTask    = nil
+        searchAnalyticsTask?.cancel()
+        searchAnalyticsTask   = nil
         utilityResult         = nil
         utilityIsLoading      = false
         utilityError          = nil

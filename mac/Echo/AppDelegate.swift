@@ -277,7 +277,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.launchAtLogin.refreshStatus()
+            Task { @MainActor in
+                self?.launchAtLogin.refreshStatus()
+            }
         }
     }
 }

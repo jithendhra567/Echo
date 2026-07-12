@@ -256,20 +256,18 @@ struct ClipCardView: View {
 
     private func handleTap() {
         viewModel.copyForPaste(clip, surface: "clipboard_panel")
-        showCopiedThenDismiss()
+        showCopiedFeedback()
     }
 
     private func handlePlainTextCopy() {
         viewModel.copyToPasteboardAsPlainText(clip, surface: "clipboard_panel")
-        showCopiedThenDismiss()
+        showCopiedFeedback()
     }
 
-    private func showCopiedThenDismiss() {
+    private func showCopiedFeedback() {
         withAnimation(.spring(response: 0.22, dampingFraction: 0.72)) { isCopied = true }
         Task {
             try? await Task.sleep(for: .milliseconds(650))
-            viewModel.dismiss()
-            try? await Task.sleep(for: .milliseconds(200))
             withAnimation(.easeOut(duration: 0.25)) { isCopied = false }
         }
     }

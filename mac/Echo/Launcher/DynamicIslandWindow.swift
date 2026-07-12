@@ -60,8 +60,10 @@ final class DynamicIslandWindow: NSPanel, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, self.isShowing else { return }
-            self.reposition()
+            Task { @MainActor in
+                guard let self, self.isShowing else { return }
+                self.reposition()
+            }
         }
     }
 

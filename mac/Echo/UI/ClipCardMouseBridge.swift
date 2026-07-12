@@ -146,11 +146,7 @@ struct ClipCardMouseBridge: NSViewRepresentable {
             let contentType = clip?.contentType.rawValue ?? "unknown"
             let outcome = operation == [] ? "cancelled" : "dropped"
             AnalyticsService.logClipDragCompleted(contentType: contentType, outcome: outcome)
-            if operation == [] {
-                isDraggingBinding?.wrappedValue = false
-                return
-            }
-            Task { @MainActor in viewModel?.dismiss() }
+            isDraggingBinding?.wrappedValue = false
         }
 
         /// Snapshots the rendered card; falls back to a lightweight content preview.

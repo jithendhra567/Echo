@@ -132,12 +132,30 @@ actor ClipStore {
         return clips
     }
 
-    /// Pinned clips are never pruned.
+    /// Pinned clips are never pruned. Also drops historically captured mega-blobs
+    /// that make launcher search scan multi-megabyte strings on every keystroke.
+    private static let maxStoredContentBytes = 256 * 1024
+    private static let maxStoredImageBytes = 8 * 1024 * 1024
+
     func prune() {
         guard let db else { return }
         let cutoff = Date().timeIntervalSince1970 - Self.retentionTTL
         prepare(db: db, sql: "DELETE FROM clips WHERE is_pinned = 0 AND created_at < ?;") { stmt in
             sqlite3_bind_double(stmt, 1, cutoff)
+        }
+        prepare(
+            db: db,
+            sql: """
+                DELETE FROM clips
+                WHERE is_pinned = 0
+                  AND (
+                    (content_type != 'image' AND length(content_data) > ?)
+                    OR (content_type = 'image' AND length(content_data) > ?)
+                  );
+                """
+        ) { stmt in
+            sqlite3_bind_int(stmt, 1, Int32(Self.maxStoredContentBytes))
+            sqlite3_bind_int(stmt, 2, Int32(Self.maxStoredImageBytes))
         }
     }
 

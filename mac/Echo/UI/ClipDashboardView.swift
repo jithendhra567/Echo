@@ -11,7 +11,7 @@ struct ClipDashboardView: View {
             clips = clips.filter { $0.autoTag == selectedTag }
         }
         guard !searchText.isEmpty else { return clips }
-        let q = searchText.lowercased()
+        let q = searchText
         return clips
             .compactMap { clip -> (Clip, Int)? in
                 guard let score = searchScore(clip: clip, query: q) else { return nil }
@@ -22,13 +22,20 @@ struct ClipDashboardView: View {
     }
 
     private func searchScore(clip: Clip, query: String) -> Int? {
-        let text   = (clip.plainText ?? clip.attributedString?.string ?? "").lowercased()
-        let source = (clip.sourceAppName ?? "").lowercased()
-        let window = (clip.windowTitle ?? "").lowercased()
-        if text.contains(query)                                          { return 1_000 }
-        if source.contains(query) || window.contains(query)              { return   500 }
-        if fuzzySequential(query, in: text)                              { return   200 }
-        if fuzzySequential(query, in: source) || fuzzySequential(query, in: window) { return 100 }
+        let text = clip.searchableText ?? ""
+        let source = clip.sourceAppName ?? ""
+        let window = clip.windowTitle ?? ""
+        if text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil { return 1_000 }
+        if source.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            || window.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            return 500
+        }
+        let textLower = text.lowercased()
+        let sourceLower = source.lowercased()
+        let windowLower = window.lowercased()
+        let q = query.lowercased()
+        if fuzzySequential(q, in: textLower) { return 200 }
+        if fuzzySequential(q, in: sourceLower) || fuzzySequential(q, in: windowLower) { return 100 }
         return nil
     }
 
@@ -111,20 +118,22 @@ struct ClipDashboardView: View {
             PlainTextPasteToggle(style: .panel)
                 .fixedSize()
 
-            // Close button — right side
+            Spacer(minLength: 0)
+
             Button { viewModel.dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .padding(5)
-                    .background(Circle().fill(Color.secondary.opacity(0.15)))
+                Text("Close")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.red.opacity(0.82))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.red.opacity(0.14))
+                    )
             }
             .buttonStyle(.plain)
             .help("Close")
         }
-        // Cap the row width so it stays compact and centered on wide screens.
-        .frame(maxWidth: 740)
-        .frame(maxWidth: .infinity)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
     }

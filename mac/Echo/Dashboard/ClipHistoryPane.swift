@@ -95,11 +95,14 @@ struct ClipboardHistoryPane: View {
             clips = clips.filter { $0.autoTag == selectedTag }
         }
         guard !searchText.isEmpty else { return clips }
-        let q = searchText.lowercased()
+        let q = searchText
         return clips.filter { clip in
-            ClipRowCache.previewText(for: clip).lowercased().contains(q)
-                || (clip.sourceAppName ?? "").lowercased().contains(q)
-                || (clip.windowTitle ?? "").lowercased().contains(q)
+            ClipRowCache.previewText(for: clip)
+                .range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                || (clip.sourceAppName ?? "")
+                    .range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                || (clip.windowTitle ?? "")
+                    .range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         }
     }
 
@@ -354,10 +357,8 @@ enum ClipRowCache {
         }
         let raw: String
         switch clip.contentType {
-        case .plainText, .url:
-            raw = clip.plainText ?? ""
-        case .richText:
-            raw = clip.attributedString?.string ?? "Rich text"
+        case .plainText, .url, .richText:
+            raw = clip.previewSnippet
         case .image:
             raw = "Image"
         }

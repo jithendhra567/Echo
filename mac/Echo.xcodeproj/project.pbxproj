@@ -11,12 +11,10 @@
 		24C66DFFA39766AF0CD42C0F /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 1152116030B405BA5109DA70 /* FirebaseRemoteConfig */; };
 		DFAA2F0206EFC90DEC742284 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 98BDEE2818E537DEE8DFE2AD /* FirebaseAnalytics */; };
 		E3BE19127458FEB18BF1EA31 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 776E6EAC7DE650F1A696B4D0 /* FirebaseCore */; };
-		EB4155A37471A168BAF88400 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C7E9258C2582679A87B204EC /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		742C64E42FAC05E800C7F298 /* Echo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C7E9258C2582679A87B204EC /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = text.plist; name = "GoogleService-Info.plist"; path = "Echo/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -47,7 +45,6 @@
 			children = (
 				742C64E62FAC05E800C7F298 /* Echo */,
 				742C64E52FAC05E800C7F298 /* Products */,
-				C7E9258C2582679A87B204EC /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -131,7 +128,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EB4155A37471A168BAF88400 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

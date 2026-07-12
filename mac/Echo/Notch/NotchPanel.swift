@@ -12,7 +12,7 @@ import SwiftUI
 /// accept events while the pill is active).
 final class NotchPanel: NSPanel {
 
-    let viewModel = NotchViewModel()
+    let viewModel: NotchViewModel
     private let layoutGuide: NotchLayoutGuide
     private let dragMon = GlobalDragMonitor()
     nonisolated(unsafe) private var screenChangeObserver: NSObjectProtocol?
@@ -44,6 +44,7 @@ final class NotchPanel: NSPanel {
 
     init(layoutGuide: NotchLayoutGuide) {
         self.layoutGuide = layoutGuide
+        self.viewModel = NotchViewModel()
         let size   = NotchSizing.windowSize
         let screen = NotchSizing.targetScreenForPanel()
         let origin = NotchSizing.windowOrigin(for: screen, size: size)
@@ -96,17 +97,23 @@ final class NotchPanel: NSPanel {
         screenChangeObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.applyScreenLayout() }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.applyScreenLayout() }
+        }
 
         activeSpaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.applyScreenLayout() }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.applyScreenLayout() }
+        }
 
         activateAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.applyScreenLayout() }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.applyScreenLayout() }
+        }
     }
 
     // MARK: - Cursor tracking (ignoresMouseEvents toggle)

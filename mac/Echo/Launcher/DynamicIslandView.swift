@@ -971,17 +971,7 @@ private struct ClipResultRow: View {
         if clip.isLink, let title = clip.linkTitle, !title.isEmpty {
             return title
         }
-        let raw: String
-        switch clip.contentType {
-        case .plainText, .url:
-            raw = clip.plainText ?? ""
-        case .richText:
-            raw = clip.attributedString?.string ?? ""
-        case .image:
-            return "Image\(clip.sourceAppName.map { " · \($0)" } ?? "")"
-        }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "—" : trimmed
+        return clip.previewSnippet
     }
 
     var body: some View {

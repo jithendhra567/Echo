@@ -29,8 +29,7 @@ actor LinkMetadataFetcher {
             }
         }
 
-        if let host = pageURL.host {
-            let faviconURL = URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=64")!
+        if let faviconURL = FaviconURL.google(for: pageURL, size: 64) {
             meta.faviconData = await downloadImage(url: faviconURL, maxBytes: 120_000)
         }
 

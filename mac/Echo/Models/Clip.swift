@@ -85,6 +85,39 @@ struct Clip: Identifiable, Sendable {
         )
     }
 
+    /// Text scanned by launcher clipboard search. Cap length so a historically
+    /// captured mega-paste cannot freeze every keystroke on the main thread.
+    var searchableText: String? {
+        switch contentType {
+        case .plainText, .url:
+            guard let text = plainText else { return nil }
+            if text.utf8.count <= 64 * 1024 { return text }
+            return String(text.prefix(64 * 1024 / 4))
+        case .richText:
+            guard contentData.count <= 64 * 1024 else { return nil }
+            return attributedString?.string
+        case .image:
+            return nil
+        }
+    }
+
+    /// Short UTF-8 prefix for list rows — avoids allocating multi-MB strings on every redraw.
+    var previewSnippet: String {
+        switch contentType {
+        case .plainText, .url:
+            let chunk = contentData.prefix(800)
+            let text = String(decoding: chunk, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? "—" : text
+        case .richText:
+            let text = searchableText?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? "Rich text" : text
+        case .image:
+            return "Image\(sourceAppName.map { " · \($0)" } ?? "")"
+        }
+    }
+
     /// Plain-text payload for copy-as-plain-text (strips RTF formatting).
     var resolvedPlainText: String? {
         switch contentType {
@@ -386,9 +419,13 @@ extension NSColor {
 // MARK: - Date helper
 
 extension Date {
-    var relativeFormatted: String {
+    private static let shortRelativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
-        return f.localizedString(for: self, relativeTo: Date())
+        return f
+    }()
+
+    var relativeFormatted: String {
+        Self.shortRelativeFormatter.localizedString(for: self, relativeTo: Date())
     }
 }
