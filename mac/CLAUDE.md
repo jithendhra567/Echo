@@ -32,6 +32,15 @@ Echo/
 ├── ContentView.swift          # Accessibility permission onboarding UI
 ├── LaunchAtLoginController.swift  # @Observable; SMAppService.mainApp (macOS 13+); toggle login-item
 │
+├── Companion/                 # Android phone pairing (LAN WebSocket)
+│   ├── CompanionController.swift  # QR pairing, clipboard bridge, app stream orchestration
+│   ├── CompanionServer.swift      # NWListener WebSocket on port 8742
+│   ├── CompanionProtocol.swift    # Shared wire protocol / DTOs
+│   ├── AppStreamCapture.swift     # ScreenCaptureKit per-app window stream (JPEG)
+│   ├── RemoteInputInjector.swift  # Tap / scroll / key injection into streamed window
+│   ├── CompanionAppCatalog.swift  # Running apps list for the phone
+│   └── LocalNetworkInfo.swift     # LAN IPv4 for QR payload
+│
 ├── Models/Clip.swift          # Clip struct (Sendable); ClipContentType enum
 ├── Clipboard/                 # ClipboardMonitor (500ms poll) + AppMetadataCapture (AX API)
 ├── Database/ClipStore.swift   # `actor`; raw SQLite3; save / fetchRecent / delete

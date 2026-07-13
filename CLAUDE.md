@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Directory | Contents |
 |-----------|----------|
 | `mac/` | macOS SwiftUI app (primary platform) — see `mac/CLAUDE.md` |
+| `android/` | Android companion (QR pairing, clipboard sync, per-app stream) |
 | `website/` | Astro static site (marketing / landing page) |
 | `windows/` | Windows port (placeholder) |
 

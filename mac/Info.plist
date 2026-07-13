@@ -26,6 +26,14 @@
 	<string>Echo reads your open browser tabs so you can search and switch to them from the launcher.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Echo shows your camera in the notch mirror when you choose that tab.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Echo streams individual app windows to your paired phone over the local network — not your entire desktop.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Echo connects to your phone on the local network for clipboard sync and app streaming.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_echo-companion._tcp</string>
+	</array>
 		<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>SUEnableAutomaticChecks</key>

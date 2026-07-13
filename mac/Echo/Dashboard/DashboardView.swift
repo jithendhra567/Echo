@@ -17,6 +17,7 @@ struct DashboardView: View {
                     Section("Settings") {
                         sidebarRow(.general)
                         sidebarRow(.clipboard)
+                        sidebarRow(.devices)
                         sidebarRow(.privacy)
                     }
                     Section("Insights") {
@@ -35,6 +36,7 @@ struct DashboardView: View {
                 switch selection {
                 case .general:        GeneralSettingsPane()
                 case .clipboard:      ClipboardSettingsPane()
+                case .devices:        DevicesSettingsPane()
                 case .privacy:        PrivacySettingsPane()
                 case .statistics, .none: StatisticsPane()
                 case .history:        ClipboardHistoryPane()
@@ -59,12 +61,13 @@ struct DashboardView: View {
 // MARK: - Sidebar items
 
 private enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case general, clipboard, privacy, statistics, history, about
+    case general, clipboard, devices, privacy, statistics, history, about
     var id: String { rawValue }
     var title: String {
         switch self {
         case .general:    "General"
         case .clipboard:  "Clipboard"
+        case .devices:    "Phone"
         case .privacy:    "Privacy"
         case .statistics: "Statistics"
         case .history:    "History"
@@ -75,6 +78,7 @@ private enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .general:    "gearshape.fill"
         case .clipboard:  "doc.on.clipboard.fill"
+        case .devices:    "iphone"
         case .privacy:    "hand.raised.fill"
         case .statistics: "chart.bar.fill"
         case .history:    "clock.arrow.circlepath"

@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let forceUpdateController = ForceUpdateController()
     private var onboardingController: OnboardingController?
     private let appLaunchTime = Date()
+    let companion = CompanionController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Must be set programmatically rather than via LSUIElement = true in Info.plist.
@@ -65,8 +66,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         viewModel.onDismiss = { [weak self] in self?.panel.hide() }
+        companion.configure(store: store, monitor: monitor)
+        companion.onRemoteClip = { [weak self] clip, result in
+            self?.viewModel.handleNewClip(clip, result)
+        }
+        companion.onHistoryChanged = { [weak self] in
+            self?.viewModel.loadPanelFirstPage()
+        }
         monitor.onNewClip   = { [weak self] clip, result in
             self?.viewModel.handleNewClip(clip, result)
+            if case .inserted = result {
+                self?.companion.broadcastNewClip(clip)
+            }
         }
 
         hotkeyManager.onFire = { [weak self] in self?.launcherPanel.toggle() }
@@ -190,6 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(notchLayoutGuide)
             .environment(appSettings)
             .environment(statsProvider)
+            .environment(companion)
             .environment(\.showOnboardingAgain, { [weak self] in self?.showOnboardingAgain() })
 
         let window = NSWindow(
@@ -261,6 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         let duration = Int(Date().timeIntervalSince(appLaunchTime))
         AnalyticsService.logAppQuit(sessionDurationSec: max(duration, 0))
+        companion.stop()
         hotkeyManager.unregister()
         clipHotkeyManager.unregister()
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
